@@ -6,21 +6,24 @@ import scipy.optimize as opt
 
 from . import TestFunctions as tf
 
-"""
-This function computes the tangent to the curve at a given point by solving D_u G * tau = - G_p.
-The tangent vector then is [tau, 1] with normalization.
+from typing import Callable, List, Tuple, Dict, Any
 
-The arguments are:
-	- u: The current state variable
-	- p: The current parameter
-	- Gu_v: The Jacobian of the system with respect to the state variable as a function of u, p, v
-	- Gp: The Jacobian of the system with respect to the parameter as a function of u and p
-	- prev_tau: The previous tangent vector (used for initial guess)
-	- M: The size of the state variable
-	- a_tol: The absolute tolerance for the Newton-Raphson solver
-"""
 def computeTangent(u, p, Gu_v, Gp, prev_tau, M, a_tol):
-	DG = slg.LinearOperator((M, M), matvec=lambda v: Gu_v(u, p, v))
+	"""
+	This function computes the tangent to the curve at a given point by solving D_u G * tau = - G_p.
+	The tangent vector then is [tau, 1] with normalization.
+
+	The arguments are:
+		- u: The current state variable
+		- p: The current parameter
+		- Gu_v: The Jacobian of the system with respect to the state variable as a function of u, p, v
+		- Gp: The Jacobian of the system with respect to the parameter as a function of u and p
+		- prev_tau: The previous tangent vector (used for initial guess)
+		- M: The size of the state variable
+		- a_tol: The absolute tolerance for the Newton-Raphson solver
+	"""
+
+	DG = slg.LinearOperator(shape=(M, M), matvec=lambda v: Gu_v(u, p, v))
 	tau = slg.gmres(DG, -Gp(u, p), x0=prev_tau[:M], atol=a_tol)[0]
 	tangent = np.append(tau, 1.0)
 	tangent = tangent / lg.norm(tangent)
@@ -30,8 +33,24 @@ def computeTangent(u, p, Gu_v, Gp, prev_tau, M, a_tol):
 		tangent = -tangent
 	return tangent
 
-def continuation(G, Gu_v, Gp, u0, p0, initial_tangent, ds_min, ds_max, ds, N_steps, a_tol=1.e-10, max_it=10, r_diff=1.e-8):
+def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
+                 Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
+                 Gp : Callable[[np.ndarray, float], np.ndarray], 
+                 u0 : np.ndarray, 
+                 p0 : float, 
+                 initial_tangent : np.ndarray, 
+                 ds_min : float, 
+                 ds_max : float, 
+                 ds : float, 
+                 n_steps : int, 
+                 sp : Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray, List]:
+	# Infer parameters from inputs
 	M = u0.size
+	a_tol = sp["tolerance"]
+	max_it = sp["nk_maxiter"]
+	r_diff = sp["rdiff"]
+
+	# Initialize a point on the path
 	u = np.copy(u0) # Always the previous point on the curve
 	p = np.copy(p0)	# Always the previous point on the curve
 	u_path = [u]
@@ -43,8 +62,7 @@ def continuation(G, Gu_v, Gp, u0, p0, initial_tangent, ds_min, ds_max, ds, N_ste
 	# Choose intial tangent (guess). We need to negate to find the actual search direction
 	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
 
-	# Variables for test_fn bifurcation detection - 
-	# Ensure no component in the direction of the tangent
+	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
 	rng = rd.RandomState()
 	r = rng.normal(0.0, 1.0, M+1)
 	l = rng.normal(0.0, 1.0, M+1)
@@ -55,7 +73,7 @@ def continuation(G, Gu_v, Gp, u0, p0, initial_tangent, ds_min, ds_max, ds, N_ste
 	prev_tau_value = 0.0
 	prev_tau_vector = None
 
-	for n in range(1, N_steps+1):
+	for n in range(1, n_steps+1):
 		# Determine the tangent to the curve at current point
 		tangent = computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol)
 
@@ -71,7 +89,7 @@ def continuation(G, Gu_v, Gp, u0, p0, initial_tangent, ds_min, ds_max, ds, N_ste
 			p_p = p + tangent[M]   * ds
 			x_p = np.append(u_p, p_p)
 
-			# Corrector: Newton-Raphson
+			# Corrector: Newton-Krylov
 			try:
 				x_result = opt.newton_krylov(F, x_p, f_tol=a_tol, maxiter=max_it, verbose=False)
 				ds = min(1.2*ds, ds_max)
@@ -82,7 +100,7 @@ def continuation(G, Gu_v, Gp, u0, p0, initial_tangent, ds_min, ds_max, ds, N_ste
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
-			return u_path, p_path, []
+			return np.array(u_path), np.array(p_path), []
 		u_new = x_result[0:M]
 		p_new = x_result[M]
 

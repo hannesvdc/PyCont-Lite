@@ -18,23 +18,22 @@ def _find_all_zeros(f):
     return roots
 
 # Minimizing the residual of a system is more stable than finding the exact nullspace
-def _computeNullspace(Gu, Gp, M):
+def _computeNullspace(Gu, Gp, M, r_diff):
     phi_0 = np.eye(M)[:,0]
     phi_objective = lambda y: 0.5*np.dot(Gu(y), Gu(y))
     phi_constraint = opt.NonlinearConstraint(lambda y: np.dot(y, y) - 1.0, 0.0, 0.0)
-    min_result = opt.minimize(phi_objective, phi_0, constraints=(phi_constraint))
+    min_result = opt.minimize(phi_objective, phi_0, constraints=(phi_constraint), method="BFGS", options={"eps": r_diff})
     phi = min_result.x
 
     w_objective = lambda y: np.sqrt(np.dot(Gu(y) + Gp, Gu(y) + Gp))
-    min_result = opt.minimize(w_objective, np.zeros(M))
+    min_result = opt.minimize(w_objective, np.zeros(M), method="BFGS", options={"eps": r_diff})
     w = min_result.x
     w_1 = np.append(w, 1.0)
 
     return phi, w, w_1
 
 # Gu_v takes arguments u, p, v
-def _computeCoefficients(Gu_v, Gp, x_s, phi, w, w_1, M):
-    r_diff = 1.e-8
+def _computeCoefficients(Gu_v, Gp, x_s, phi, w, w_1, M, r_diff):
 
     # Compute a
     Gu_phi = lambda x: Gu_v(x[0:M], x[M], phi)
@@ -55,7 +54,7 @@ def _solveABSystem(a, b, c):
 
     return solutions
 
-def branchSwitching(G, Gu_v, Gp, x_s, x_prev):
+def branchSwitching(G, Gu_v, Gp, x_s, x_prev, sp):
     print('\nBranch Switching')
     # Setting up variables
     M = x_s.size - 1
@@ -63,8 +62,8 @@ def branchSwitching(G, Gu_v, Gp, x_s, x_prev):
     p = x_s[M]
 
     # Computing necessary coefficients and vectors
-    phi, w, w_1 =_computeNullspace(lambda v: Gu_v(u, p, v), Gp(u,p), M)
-    a, b, c = _computeCoefficients(Gu_v, Gp, x_s, phi, w, w_1, M)
+    phi, w, w_1 =_computeNullspace(lambda v: Gu_v(u, p, v), Gp(u,p), M, sp["rdiff"])
+    a, b, c = _computeCoefficients(Gu_v, Gp, x_s, phi, w, w_1, M, sp["rdiff"])
     solutions = _solveABSystem(a, b, c)
 
     # Fina all 4 branch tangents
@@ -80,7 +79,7 @@ def branchSwitching(G, Gu_v, Gp, x_s, x_prev):
 
         tangent = np.append(alpha*phi + beta/np.sqrt(1.0)*w, beta/np.sqrt(1.0))
         x0 = x_s + s * tangent / lg.norm(tangent)
-        dir = opt.newton_krylov(F_branch, x0)
+        dir = opt.newton_krylov(F_branch, x0, rdiff=sp["rdiff"], f_tol=sp["tolerance"])
 
         directions.append(dir)
         tangents.append(tangent)
