@@ -12,8 +12,9 @@ def FoldTest():
 	ds_max = 0.01
 	ds_min = 1.e-6
 	ds = 0.1
-	N = 5000
-	continuation_result = pycont.pseudoArclengthContinuation(f, u0, p0, ds_min, ds_max, ds, N, tolerance=1.e-10)
+	n_steps = 5000
+	solver_parameters = {"tolerance": 1e-10}
+	continuation_result = pycont.pseudoArclengthContinuation(f, u0, p0, ds_min, ds_max, ds, n_steps, solver_parameters=solver_parameters)
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))

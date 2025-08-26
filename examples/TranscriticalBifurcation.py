@@ -10,10 +10,11 @@ def TransCriticalTest():
 	ds_min = 1.e-6
 	ds0 = 0.1
 
-	N = 10000
+	n_steps = 10000
 	u0 = np.array([-5.0])
 	p0 = -5.0
-	continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min, ds_max, ds0, N, tolerance=1.e-10)
+	solver_parameters = {"tolerance": 1e-10}
+	continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))
