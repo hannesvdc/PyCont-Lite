@@ -80,6 +80,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     rdiff = sp.setdefault("rdiff", 1e-8)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
+    sp.setdefault("bifurcation_detection", True)
 
     # Create gradient functions
     Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff

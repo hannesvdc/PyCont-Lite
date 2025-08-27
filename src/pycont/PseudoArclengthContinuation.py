@@ -107,21 +107,23 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		p_new = x_result[M]
 
 		# Do bifurcation detection in the new point
-		tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
-		if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
-			print('Sign change detected', prev_tau_value, tau_value)
-			is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
-			if is_bf:
-				return np.array(u_path), np.array(p_path), [x_singular]
+		if sp["bifurcation_detection"]:
+			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
+			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
+				print('Sign change detected', prev_tau_value, tau_value)
+				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
+				if is_bf:
+					return np.array(u_path), np.array(p_path), [x_singular]
+				
+			prev_tangent = np.copy(tangent)
+			prev_tau_value = tau_value
+			prev_tau_vector = tau_vector
 
 		# Bookkeeping for the next step
 		u = np.copy(u_new)
 		p = np.copy(p_new)
 		u_path.append(u)
 		p_path.append(p)
-		prev_tangent = np.copy(tangent)
-		prev_tau_value = tau_value
-		prev_tau_vector = tau_vector
 		
 		# Print the status
 		print_str = 'Step n: {0:3d}\t u: {1:4f}\t p: {2:4f}'.format(n, lg.norm(u), p)
