@@ -41,8 +41,7 @@ p0 = 0.0
 continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min=0.001, ds_max=0.05, ds=0.01, N=200)
 
 # Plot the solution curve
-for n in range(len(continuation_result.branches)):
-		branch = continuation_result.branches[n]
+for branch in continuation_result.branches:
 		ax.plot(branch['p'], branch['u'][:,0], 'blue')
 plt.xlabel('p')
 plt.ylabel('u')

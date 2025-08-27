@@ -51,6 +51,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	a_tol = sp["tolerance"]
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]
+	bifurcation_detection = sp["bifurcation_detection"]
 
 	# Initialize a point on the path
 	u = np.copy(u0) # Always the previous point on the curve
@@ -107,7 +108,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		p_new = x_result[M]
 
 		# Do bifurcation detection in the new point
-		if sp["bifurcation_detection"]:
+		if bifurcation_detection:
 			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
