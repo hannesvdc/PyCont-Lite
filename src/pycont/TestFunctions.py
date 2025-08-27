@@ -25,3 +25,29 @@ def test_fn_bifurcation_exact(matvec, rhs):
 	for col  in range(rhs.size):
 		A[:, col] = matvec(np.eye(rhs.size)[:, col])
 	return lg.solve(A, rhs)
+
+
+def test_fn_bifurcation_fast(dF_w, x, l, r, M, y_prev, eps_reg=1e-6):
+	"""
+    Fast/stable Beyn-Keller test function via Schur complement.
+
+    Computes phi = -l^T (J+eps I)^{-1} r using one solve of size (M+1)x(M+1).
+    Returns y, phi
+    """
+	
+	# Build (J + eps I) v using the Jacobian-vector product dF_w at point x
+	def Jv(v):
+		return dF_w(x, v) + eps_reg * v
+	sys = slg.LinearOperator((M+1, M+1), Jv)
+	y, info = slg.lgmres(sys, r, x0=y_prev, maxiter=1000)
+	phi = -np.dot(l, y)
+
+	# Check if the l-gmres solver converged. If not, switch to a slow direct solver.
+	gmres_residual = lg.norm(Jv(y) - r)
+	if gmres_residual > 1000 * eps_reg:
+		print('GMRES Failed, Switching to a Direct Solver with the full Jacobian.', phi, gmres_residual)
+		y = test_fn_bifurcation_exact(Jv, r)
+		phi = -np.dot(l, y)
+		print('New Solution with Full Jacobian', phi, lg.norm(Jv(y) - r))
+
+	return y, phi
