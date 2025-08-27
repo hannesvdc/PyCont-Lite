@@ -55,6 +55,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             Maximum Newton-Krylov iterations per corrector.
         - "tolerance": float (default 1e-10)
             Nonlinear residual tolerance for convergence.
+        - "bifurcation_detection" : bool (default True)
+            Disabling bifurcation detection can significantly speed up continuation when there are no bifurcation points.
 
     Returns
     -------
