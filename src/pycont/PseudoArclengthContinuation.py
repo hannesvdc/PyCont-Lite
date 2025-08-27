@@ -23,8 +23,10 @@ def computeTangent(u, p, Gu_v, Gp, prev_tau, M, a_tol):
 		- a_tol: The absolute tolerance for the Newton-Raphson solver
 	"""
 
-	DG = slg.LinearOperator(shape=(M, M), matvec=lambda v: Gu_v(u, p, v))
-	tau = slg.gmres(DG, -Gp(u, p), x0=prev_tau[:M], atol=a_tol)[0]
+	DG = slg.LinearOperator((M, M), lambda v: Gu_v(u, p, v))
+	b = -Gp(u, p)
+
+	tau = slg.lgmres(DG, b, x0=prev_tau[:M], atol=a_tol)[0]
 	tangent = np.append(tau, 1.0)
 	tangent = tangent / lg.norm(tangent)
 
@@ -91,7 +93,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 			# Corrector: Newton-Krylov
 			try:
-				x_result = opt.newton_krylov(F, x_p, f_tol=a_tol, maxiter=max_it, verbose=False)
+				x_result = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				ds = min(1.2*ds, ds_max)
 				break
 			except:

@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.linalg as lg
+import scipy.optimize as opt
 
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
@@ -77,18 +78,20 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
     rdiff = sp.setdefault("rdiff", 1e-8)
-    sp.setdefault("nk_maxiter", 10)
+    nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
 
     # Create gradient functions
     Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff
     Gp = lambda u, p: (G(u, p + rdiff) - G(u, p)) / rdiff
 
-    # Compute the initial tangent to the curve
+    # Compute the initial tangent to the curve using the secant method
+    print('\nComputing Initial Tangent to the Branch.')
     M = u0.size
-    rng = np.random.RandomState()
-    random_tangent = rng.normal(0.0, 1.0, M+1)
-    tangent = pac.computeTangent(u0, p0, Gu_v, Gp, random_tangent/lg.norm(random_tangent), M, tolerance)
+    u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
+    initial_tangent = (u1 - u0) / rdiff
+    initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
+    tangent = pac.computeTangent(u0, p0, Gu_v, Gp, initial_tangent, M, tolerance)
 
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
