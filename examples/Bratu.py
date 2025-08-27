@@ -29,8 +29,8 @@ def BratuTest():
     # Do continuation
     ds_max = 0.01
     ds_min = 1e-6
-    ds0 = 0.01
-    n_steps = 1000
+    ds0 = 1e-4
+    n_steps = 2000
     solver_parameters = {"tolerance": 1e-10, "bifurcation_detection": False}
     continuation_result = pycont.pseudoArclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
@@ -40,11 +40,11 @@ def BratuTest():
 
     # Plot the bifurcation diagram (lambda, max(u))
     for branch in continuation_result.branches:
-        max_u = np.max(branch["u"], axis=1)
+        max_u = np.sign(branch["u"][:, 50]) * np.max(np.abs(branch["u"]), axis=1)
         plt.plot(branch["p"], max_u, color="tab:blue")
     plt.plot(lam0, np.max(u0), 'go', label='SP')
     plt.xlabel(r"$\lambda$")
-    plt.ylabel(r"$\max u(x)$")
+    plt.ylabel(r"$u(x)$")
     plt.show()
 
 if __name__ == '__main__':
