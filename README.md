@@ -34,7 +34,7 @@ def G(u, p):
     return u**3 - p*u
 
 # Initial guess
-u0 = np.array([1e-2])
+u0 = np.array([2.0])
 p0 = 0.0
 
 # Run continuation
@@ -50,7 +50,7 @@ continuation_result = pycont.pseudoArclengthContinuation(
 # Plot the solution curve
 for n in range(len(continuation_result.branches)):
 		branch = continuation_result.branches[n]
-		ax.plot(branch['p'], branch['u'], 'blue')
+		ax.plot(branch['p'], branch['u'][:,0], 'blue')
 plt.xlabel('p')
 plt.ylabel('u')
 plt.title('Bifurcation diagram')
