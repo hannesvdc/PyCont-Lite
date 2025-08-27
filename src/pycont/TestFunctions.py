@@ -11,7 +11,7 @@ def test_fn_bifurcation(dF_w, x, l, r, M, y_prev, eps_reg=1.e-6):
 		return np.append(el_1, el_2)
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
-	y, info = slg.gmres(sys, rhs, x0=y_prev, maxiter=10000)
+	y, info = slg.lgmres(sys, rhs, x0=y_prev, maxiter=10000)
 
 	# Check if the l-gmres solver converged. If not, switch to a slow direct solver.
 	if y_prev is None or info > 0 or np.abs(y[M+1]) > 100:

@@ -27,7 +27,7 @@ def PitchforkTest():
 	ax.plot(0.0*y_grid, y_grid, color='lightgray')
 	for n in range(len(continuation_result.branches)):
 		branch = continuation_result.branches[n]
-		ax.plot(branch['p'], branch['u'], color='blue')
+		ax.plot(branch['p'], branch['u'][:,0], color='blue')
 	ax.plot(p0, u0, 'go', label='SP')
 	for n in range(len(continuation_result.bifurcation_points)):
 		ax.plot(continuation_result.bifurcation_points[n][1], continuation_result.bifurcation_points[n][0], 'ro', label='BP')
