@@ -38,14 +38,7 @@ u0 = np.array([2.0])
 p0 = 0.0
 
 # Run continuation
-continuation_result = pycont.pseudoArclengthContinuation(
-    G,
-    u0, p0,
-    ds_min=0.001,
-    ds_max=0.05,
-    ds=0.01,
-    N=200
-)
+continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min=0.001, ds_max=0.05, ds=0.01, N=200)
 
 # Plot the solution curve
 for n in range(len(continuation_result.branches)):
