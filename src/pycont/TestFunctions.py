@@ -26,7 +26,6 @@ def test_fn_bifurcation_exact(matvec, rhs):
 		A[:, col] = matvec(np.eye(rhs.size)[:, col])
 	return lg.solve(A, rhs)
 
-
 def test_fn_bifurcation_fast(dF_w, x, l, r, M, y_prev, eps_reg=1e-6):
 	"""
     Fast/stable Beyn-Keller test function via Schur complement.
@@ -51,3 +50,18 @@ def test_fn_bifurcation_fast(dF_w, x, l, r, M, y_prev, eps_reg=1e-6):
 		print('New Solution with Full Jacobian', phi, lg.norm(Jv(y) - r))
 
 	return y, phi
+
+def test_fn_bifurcation_keller(Gu_v, Gp, u, p, tangent, M, z_prev, eps_reg=1e-5):
+	t_u = tangent[0:M]
+	t_p = tangent[M]
+
+	# Solve the linear system for z = (Gu(u, p) + eps I)^{-1} Gp
+	Jv = lambda v: Gu_v(u, p, v) + eps_reg * v
+	J = slg.LinearOperator((M, M), Jv)
+	rhs = Gp(u, p)
+	z, info = slg.lgmres(J, rhs, x0=z_prev, maxiter=1000)
+	gmres_residual = lg.norm(Jv(z) - rhs)
+	phi = t_p - np.dot(t_u, z)
+	print('gmres residual', gmres_residual, phi)
+
+	return phi, z
