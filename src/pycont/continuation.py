@@ -133,7 +133,6 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         if lg.norm(x_singular - result.bifurcation_points[n]) / M < 1.e-4:
             return
     result.bifurcation_points.append(x_singular)
-    print('Bifurcation Point at', x_singular)
         
     # The bifurcation point is unique, do branch switching
     x_prev = np.append(u_path[-10,:], p_path[-10]) # x_prev just needs to be a point on the previous path close to the bf point

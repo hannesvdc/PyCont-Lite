@@ -22,7 +22,7 @@ def _computeNullspace(Gu, Gp, M, r_diff):
     phi_0 = np.eye(M)[:,0]
     phi_objective = lambda y: 0.5*np.dot(Gu(y), Gu(y))
     phi_constraint = opt.NonlinearConstraint(lambda y: np.dot(y, y) - 1.0, 0.0, 0.0)
-    min_result = opt.minimize(phi_objective, phi_0, constraints=(phi_constraint), method="BFGS", options={"eps": r_diff})
+    min_result = opt.minimize(phi_objective, phi_0, constraints=(phi_constraint), options={"eps": r_diff})
     phi = min_result.x
 
     w_objective = lambda y: np.sqrt(np.dot(Gu(y) + Gp, Gu(y) + Gp))
