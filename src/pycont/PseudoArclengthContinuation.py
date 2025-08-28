@@ -119,10 +119,13 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
+
 				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
+					print('Bifurcation Point at', x_singular)
 					return np.array(u_path), np.array(p_path), [x_singular]
-				
+				else:
+					print('Fold Point Detected!')
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 			#prev_zr_vector = zr_vector
@@ -176,8 +179,8 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
     """
 
 	# Compute tau at start and end
-	_, tau_start = tf.test_fn_bifurcation_fast(dF_w, x_start, l, r, M, tau_vector_prev)
-	_, tau_end = tf.test_fn_bifurcation_fast(dF_w, x_end, l, r, M, tau_vector_prev)
+	_, tau_start = tf.test_fn_bifurcation(dF_w, x_start, l, r, M, tau_vector_prev)
+	_, tau_end = tf.test_fn_bifurcation(dF_w, x_end, l, r, M, tau_vector_prev)
 
 	# Check that a sign change really exists
 	if  tau_start * tau_end > 0.0:
@@ -186,7 +189,7 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 
 	for step in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
-		_, tau_mid = tf.test_fn_bifurcation_fast(dF_w, x_mid, l, r, M, tau_vector_prev)
+		_, tau_mid = tf.test_fn_bifurcation(dF_w, x_mid, l, r, M, tau_vector_prev)
 
 		# Narrow the interval based on sign of tau
 		if tau_start * tau_mid < 0.0:
@@ -203,7 +206,15 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 	print('Warning: Bisection reached maximum steps without full convergence.')
 	return True, 0.5 * (x_start + x_end)
 
-def _computeBifurcationPointNewton(G, Gu_v, u0, p0, z_vector, M, r_diff):
+def _checkForFold(dF_w, x_start, x_end, l, r, M, tau_vector_prev):
+	# Compute tau at start and end
+	_, tau_start = tf.test_fn_bifurcation(dF_w, x_start, l, r, M, tau_vector_prev)
+	_, tau_end = tf.test_fn_bifurcation(dF_w, x_end, l, r, M, tau_vector_prev)
+
+	# Check that a sign change really exists
+	return (tau_start * tau_end > 0.0)
+
+def _computeBifurcationPointNewton(G, Gu_v, u0, p0, M, r_diff):
 	# Setup the extended system
 	def H(q : np.ndarray) -> np.ndarray:
 		u_q = q[0:M]
@@ -216,8 +227,8 @@ def _computeBifurcationPointNewton(G, Gu_v, u0, p0, z_vector, M, r_diff):
 		return np.concatenate((crit_1, crit_2, [crit_3]))
 	
 	# Solve H = 0 using Newton-Krylov
-	q0 = np.concatenate((u0, [p0], z_vector))
+	q0 = np.concatenate((u0, [p0], np.zeros_like(u0)))
 	q_bf = opt.newton_krylov(H, q0, rdiff=r_diff)
 	print('Bifurcation Point found at', q_bf[0:M], q_bf[M])
 
-	return q_bf[0:M+1], q_bf[M+1:]
+	return q_bf[0:M+1]

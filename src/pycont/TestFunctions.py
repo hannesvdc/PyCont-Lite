@@ -12,9 +12,8 @@ def test_fn_bifurcation(dF_w, x, l, r, M, y_prev, eps_reg=1.e-5):
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
 
-	# Build the preconditioner
+	# returns LinearOperator y ≈ A^{-1} b using p_m(A)=alpha*sum_{j=0}^{m-1}(I-alpha A)^j
 	def poly_inv(A_mv, alpha, m):
-		# returns LinearOperator y ≈ A^{-1} b using p_m(A)=alpha*sum_{j=0}^{m-1}(I-alpha A)^j
 		def apply(b):
 			s = b.copy()
 			y = alpha*s
@@ -22,9 +21,9 @@ def test_fn_bifurcation(dF_w, x, l, r, M, y_prev, eps_reg=1.e-5):
 				s = s - alpha*A_mv(s)
 				y = y + alpha*s
 			return y
-		return slg.LinearOperator((M+2,M+2), matvec=apply)
+		return slg.LinearOperator((M+2,M+2), apply)
 	B_inv = poly_inv(matvec, 1.0, min(M,10))
-	y, info = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
+	y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
 
 	# Check if the l-gmres solver converged. If not, switch to a slow direct solver.
 	#if y_prev is None or info > 0 or np.abs(y[M+1]) > 100:
