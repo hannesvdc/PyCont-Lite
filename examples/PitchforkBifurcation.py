@@ -5,7 +5,6 @@ import pycont
 
 def PitchforkTest():
 	def G(x, r): 
-		#print(x, r)
 		return np.array([r*x[0] - x[0]**3])
 	u0 = np.array([-2.0])
 	p0 = 4.0
