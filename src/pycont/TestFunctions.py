@@ -15,11 +15,11 @@ def test_fn_bifurcation(dF_w, x, l, r, M, y_prev, eps_reg=1.e-5):
 	def poly_inv(A_mv, alpha, m):
 		def apply(b):
 			s = b.copy()
-			y = alpha*s
+			vec = alpha*s
 			for _ in range(1, m):
 				s = s - alpha*A_mv(s)
-				y = y + alpha*s
-			return y
+				vec = vec + alpha*s
+			return vec
 		return slg.LinearOperator((M+2,M+2), apply)
 	B_inv = poly_inv(matvec, 1.0, min(M,10))
 	y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)

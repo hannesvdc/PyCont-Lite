@@ -59,11 +59,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	u_path = [u]
 	p_path = [p]
 
-	print_str = 'Step n: {0:3d}\t u: {1:4f}\t p: {2:4f}'.format(0, lg.norm(u), p)
-	print(print_str)
-
 	# Choose intial tangent (guess). We need to negate to find the actual search direction
 	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
+
+	print_str = f"Step n: {0:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {prev_tangent[M]:.4f}"
+	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
 	rng = rd.RandomState()
@@ -107,6 +107,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		u_new = x_result[0:M]
 		p_new = x_result[M]
 
+		# Do a simple fold detection
+		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
+			print('Fold point near', np.append(u_new, p_new))
+
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
 			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
@@ -117,8 +121,6 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
 					return np.array(u_path), np.array(p_path), [x_singular]
-				else:
-					print('Fold Point Detected! Continuing along this branch.')
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 
@@ -130,7 +132,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		p_path.append(p)
 		
 		# Print the status
-		print_str = 'Step n: {0:3d}\t u: {1:4f}\t p: {2:4f}'.format(n, lg.norm(u), p)
+		print_str = f"Step n: {n:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
 	return np.array(u_path), np.array(p_path), []
