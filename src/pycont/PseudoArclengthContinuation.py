@@ -66,19 +66,21 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
-	#rng = rd.RandomState()
-	#r = rng.normal(0.0, 1.0, M+1)
-	#l = rng.normal(0.0, 1.0, M+1)
-	#r = r - np.dot(r, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	#l = l - np.dot(l, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	#r = r / lg.norm(r)
-	#l = l / lg.norm(l)
-	#prev_tau_value = 0.0
-	#prev_tau_vector = None
+	rng = rd.RandomState()
+	r = rng.normal(0.0, 1.0, M+1)
+	l = rng.normal(0.0, 1.0, M+1)
+	r = r - np.dot(r, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
+	l = l - np.dot(l, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
+	r = r / lg.norm(r)
+	l = l / lg.norm(l)
+	prev_tau_value = 0.0
+	prev_tau_vector = None
+	prev_zr_vector = None
 
 	# Improved bifurcation detection
-	prev_phi_value = 0.0
-	prev_z_vector = None
+	#prev_phi_value = 0.0
+	#prev_z_vector = None
+	#prev_zr_vector = None
 
 	for n in range(1, n_steps+1):
 		# Determine the tangent to the curve at current point
@@ -112,31 +114,35 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		p_new = x_result[M]
 
 		# Do bifurcation detection in the new point
-		# if bifurcation_detection:
-		# 	tau_vector, tau_value = tf.test_fn_bifurcation_fast(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
-		# 	if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
-		# 		print('Sign change detected', prev_tau_value, tau_value)
-		# 		is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
-		# 		if is_bf:
-		# 			return np.array(u_path), np.array(p_path), [x_singular]
-				
-		# 	prev_tau_value = tau_value
-		# 	prev_tau_vector = tau_vector
-
 		if bifurcation_detection:
-			phi_value, z_vector = tf.test_fn_bifurcation_keller(Gu_v, Gp, u_new, p_new, tangent, M, prev_z_vector)
-			print('z_vector', z_vector)
-			if prev_phi_value * phi_value < 0.0:
-				print('Sign change detected', prev_phi_value, phi_value)
-				x_singular = _computeBifurcationPointNewton(G, Gu_v, u_new, p_new, z_vector, M, r_diff)
+			#tau_vector, tau_value, zr_vector = tf.test_fn_bifurcation_preconditioned(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector, prev_zr_vector)
+			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
+			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
+				print('Sign change detected', prev_tau_value, tau_value)
+				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
+				if is_bf:
+					return np.array(u_path), np.array(p_path), [x_singular]
+				
+			prev_tau_value = tau_value
+			prev_tau_vector = tau_vector
+			#prev_zr_vector = zr_vector
 
-				# Classify fold point versus bifurcation point
-				new_tangent = computeTangent(x_singular[0:M], x_singular[M], Gu_v, Gp, tangent, M, a_tol)
-				print('Tangent at bifurcation', new_tangent, new_tangent[M])
+		# if bifurcation_detection:
+		# 	#phi_value, z_vector = tf.test_fn_bifurcation_keller(Gu_v, Gp, u_new, p_new, tangent, M, prev_z_vector)
+		# 	phi_value, z_vector, zr_vector = tf.test_fn_extended_system(Gu_v, Gp, u_new, p_new, tangent, l, r, M, prev_z_vector, prev_zr_vector)
+			
+		# 	print('z_vector', z_vector)
+		# 	if prev_phi_value * phi_value < 0.0:
+		# 		print('Sign change detected', prev_phi_value, phi_value)
+		# 		#x_singular, z_singular = _computeBifurcationPointNewton(G, Gu_v, u_new, p_new, z_vector, M, r_diff)
+
+		# 		# Classify fold point versus bifurcation point
+		# 		#tf.is_bifurcation_point(Gu_v, Gp, x_singular[0:M], x_singular[M], tangent, M, z_vector)
 
 
-			prev_phi_value = phi_value
-			prev_z_vector = z_vector
+		# 	prev_phi_value = phi_value
+		# 	prev_z_vector = z_vector
+		# 	prev_zr_vector = zr_vector
 
 		# Bookkeeping for the next step
 		prev_tangent = np.copy(tangent)
@@ -214,4 +220,4 @@ def _computeBifurcationPointNewton(G, Gu_v, u0, p0, z_vector, M, r_diff):
 	q_bf = opt.newton_krylov(H, q0, rdiff=r_diff)
 	print('Bifurcation Point found at', q_bf[0:M], q_bf[M])
 
-	return q_bf[0:M+1]
+	return q_bf[0:M+1], q_bf[M+1:]
