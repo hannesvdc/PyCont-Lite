@@ -112,15 +112,18 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
+
 				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
+					print('Bifurcation Point at', x_singular)
 					return np.array(u_path), np.array(p_path), [x_singular]
-				
-			prev_tangent = np.copy(tangent)
+				else:
+					print('Fold Point Detected! Continuing along this branch.')
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 
 		# Bookkeeping for the next step
+		prev_tangent = np.copy(tangent)
 		u = np.copy(u_new)
 		p = np.copy(p_new)
 		u_path.append(u)
