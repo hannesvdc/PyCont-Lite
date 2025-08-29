@@ -55,15 +55,14 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	bifurcation_detection = sp["bifurcation_detection"]
 
 	# Initialize a point on the path
-	u = np.copy(u0)
-	p = np.copy(p0)
-	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u
-	p_path = np.zeros(n_steps+1); p_path[0] = p
+	x = np.append(u0, p0)
+	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u0
+	p_path = np.zeros(n_steps+1); p_path[0] = p0
 
 	# Choose intial tangent (guess). We need to negate to find the actual search direction
 	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
 
-	print_str = f"Step n: {0:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {prev_tangent[M]:.4f}"
+	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {prev_tangent[M]:.4f}"
 	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
@@ -77,19 +76,17 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	for n in range(1, n_steps+1):
 		# Determine the tangent to the curve at current point
-		tangent = computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol)
+		tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, prev_tangent, M, a_tol)
 
 		# Create the extended system for corrector
-		N = lambda x: np.dot(tangent, x - np.append(u, p)) + ds
-		F = lambda x: np.append(G(x[0:M], x[M]), N(x))
-		dF_w = lambda x, w: (F(x + r_diff * w) - F(x)) / r_diff
+		N = lambda q: np.dot(tangent, q - x) + ds
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		dF_w = lambda q, w: (F(q + r_diff * w) - F(q)) / r_diff
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
 			# Predictor: Follow the tangent vector
-			u_p = u + tangent[0:M] * ds
-			p_p = p + tangent[M]   * ds
-			x_p = np.append(u_p, p_p)
+			x_p = x + tangent * ds
 
 			# Corrector: Newton-Krylov
 			try:
@@ -114,7 +111,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), x_new, l, r, M, a_tol, prev_tau_vector)
+				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, x, x_new, l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
 					return u_path[0:n,:], p_path[0:n], [x_singular]
@@ -123,13 +120,12 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Bookkeeping for the next step
 		prev_tangent = np.copy(tangent)
-		u = x_new[0:M]
-		p = x_new[M]
-		u_path[n,:] = u
-		p_path[n] = p
+		x = np.copy(x_new)
+		u_path[n,:] = x[0:M]
+		p_path[n] = x[M]
 		
 		# Print the status
-		print_str = f"Step n: {n:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {tangent[M]:.4f}"
+		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
 	return u_path, p_path, []
@@ -149,6 +145,8 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
         max_bisect_steps: maximum allowed bisection steps
 
     Returns:
+		is_bf: boolean, True if there is an actual sign change in the test 
+		       function, False for a fold pint
         x_bifurcation: array (M+1,), approximated bifurcation point
     """
 
