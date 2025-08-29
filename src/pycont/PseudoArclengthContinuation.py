@@ -93,7 +93,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 			# Corrector: Newton-Krylov
 			try:
-				x_result = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
+				x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				ds = min(1.2*ds, ds_max)
 				break
 			except:
@@ -103,20 +103,18 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
 			return u_path[0:n,:], p_path[0:n], []
-		u_new = x_result[0:M]
-		p_new = x_result[M]
 
 		# Do a simple fold detection
 		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
-			print('Fold point near', np.append(u_new, p_new))
+			print('Fold point near', x_new)
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
-			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
+			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, x_new, l, r, M, prev_tau_vector)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
+				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), x_new, l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
 					return u_path[0:n,:], p_path[0:n], [x_singular]
@@ -125,8 +123,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Bookkeeping for the next step
 		prev_tangent = np.copy(tangent)
-		u = np.copy(u_new)
-		p = np.copy(p_new)
+		u = x_new[0:M]
+		p = x_new[M]
 		u_path[n,:] = u
 		p_path[n] = p
 		
