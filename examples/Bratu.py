@@ -45,6 +45,7 @@ def BratuTest():
     plt.plot(lam0, np.max(u0), 'go', label='SP')
     plt.xlabel(r"$\lambda$")
     plt.ylabel(r"$u(x)$")
+    plt.legend()
     plt.show()
 
 if __name__ == '__main__':

@@ -46,6 +46,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
                  ds : float, 
                  n_steps : int, 
                  sp : Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray, List]:
+	
 	# Infer parameters from inputs
 	M = u0.size
 	a_tol = sp["tolerance"]
@@ -54,10 +55,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	bifurcation_detection = sp["bifurcation_detection"]
 
 	# Initialize a point on the path
-	u = np.copy(u0) # Always the previous point on the curve
-	p = np.copy(p0)	# Always the previous point on the curve
-	u_path = [u]
-	p_path = [p]
+	u = np.copy(u0)
+	p = np.copy(p0)
+	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u
+	p_path = np.zeros(n_steps+1); p_path[0] = p
 
 	# Choose intial tangent (guess). We need to negate to find the actual search direction
 	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
@@ -69,10 +70,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	rng = rd.RandomState()
 	r = rng.normal(0.0, 1.0, M+1)
 	l = rng.normal(0.0, 1.0, M+1)
-	r = r - np.dot(r, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	l = l - np.dot(l, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	r = r / lg.norm(r)
-	l = l / lg.norm(l)
+	r = r - np.dot(r, prev_tangent) * prev_tangent; r = r / lg.norm(r)
+	l = l - np.dot(l, prev_tangent) * prev_tangent; l = l / lg.norm(l)
 	prev_tau_value = 0.0
 	prev_tau_vector = None
 
@@ -103,7 +102,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
-			return np.array(u_path), np.array(p_path), []
+			return u_path[0:n,:], p_path[0:n], []
 		u_new = x_result[0:M]
 		p_new = x_result[M]
 
@@ -120,7 +119,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
-					return np.array(u_path), np.array(p_path), [x_singular]
+					return u_path[0:n,:], p_path[0:n], [x_singular]
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 
@@ -128,14 +127,14 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		prev_tangent = np.copy(tangent)
 		u = np.copy(u_new)
 		p = np.copy(p_new)
-		u_path.append(u)
-		p_path.append(p)
+		u_path[n,:] = u
+		p_path[n] = p
 		
 		# Print the status
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
-	return np.array(u_path), np.array(p_path), []
+	return u_path, p_path, []
 
 def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vector_prev, max_bisect_steps=30):
 	"""
