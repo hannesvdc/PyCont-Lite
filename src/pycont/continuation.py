@@ -117,6 +117,51 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                            n_steps : int, 
                            sp : Dict[str, Any], 
                            result : ContinuationResult) -> None:
+    """
+    Internal function that performs pseudo-arclength continuation on the current branch. When the
+    continuation routine returns, this method calls the branch-switching routine in case of a
+    bifurcation point. If so, it calls itself recursively on each of the three new branches. 
+
+    Parameters
+    ----------
+    G : callable
+        Function representing the nonlinear system, with signature
+        ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    Gu_v : callable
+        Function calculating the Jacobian of G using matrix-free directional derivatives, 
+        with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
+        is the continuation parameter, and `v` is the differentiation direction.
+    Gp : callable
+        Function calculating the derivative of G with respect to the parameter,
+        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    u0 : ndarray
+        Initial solution vector corresponding to the starting parameter `p0`.
+    p0 : float
+        Initial value of the continuation parameter.
+    tangent : ndarray
+        Tangent to the current branch in (u0, p0)
+    M : int
+        Size of the state variable u
+    ds_min : float
+        Minimum allowable continuation step size.
+    ds_max : float
+        Maximum allowable continuation step size.
+    ds : float
+        Initial continuation step size.
+    n_steps : int
+        Maximum number of continuation steps to perform.
+    sp : dict
+        Additional paramters for PyCont.
+    result: ContinuationResult
+        Object that contains all continued branches and detected bifurcation points.
+
+    Returns
+    -------
+    Nothing, but `result` is updated with the new branche(s) and possible bifurcation points.
+    """    
+
     print('\n\nContinuation on Branch', len(result.branches) + 1)
     
     # Do regular continuation on this branch
@@ -141,4 +186,4 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     # For each of the branches, run pseudo-arclength continuation
     for n in range(len(directions)):
         x0 = directions[n]
-        _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], -tangents[n], M, ds_min, ds_max, ds, n_steps, sp, result)
+        _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], tangents[n], M, ds_min, ds_max, ds, n_steps, sp, result)

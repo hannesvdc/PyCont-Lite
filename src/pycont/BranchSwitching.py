@@ -74,7 +74,7 @@ def branchSwitching(G, Gu_v, Gp, x_s, x_prev, sp):
         beta  = solutions[n][1]
 
         s = 0.01
-        N = lambda x: np.dot(alpha*phi + beta/np.sqrt(1.0)*w, x[0:M] - x_s[0:M]) + beta/np.sqrt(1.0)*(x[M] - x_s[M]) + s
+        N = lambda x: np.dot(alpha*phi + beta/np.sqrt(1.0)*w, x[0:M] - x_s[0:M]) + beta/np.sqrt(1.0)*(x[M] - x_s[M]) - s
         F_branch = lambda x: np.append(G(x[0:M], x[M]), N(x))
 
         tangent = np.append(alpha*phi + beta/np.sqrt(1.0)*w, beta/np.sqrt(1.0))
@@ -94,6 +94,7 @@ def branchSwitching(G, Gu_v, Gp, x_s, x_prev, sp):
     directions.pop(idx)
     tangents.pop(idx)
     print('Branch Switching Directions:', directions)
+    print('Branch Switching Tangents:', tangents)
 
     # Returning 3 continuation directions
     return directions, tangents
