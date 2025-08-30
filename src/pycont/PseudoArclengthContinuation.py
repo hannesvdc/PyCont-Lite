@@ -230,7 +230,7 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 		print("No sign change detected between start and end points.")
 		return False, x_end
 
-	for step in range(max_bisect_steps):
+	for _ in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
 		_, tau_mid = tf.test_fn_bifurcation(dF_w, x_mid, l, r, M, tau_vector_prev)
 
