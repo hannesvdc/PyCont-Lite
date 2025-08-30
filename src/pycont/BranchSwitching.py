@@ -136,7 +136,7 @@ def _computeNullspace(Gu : Callable[[np.ndarray], np.ndarray],
     w : ndarray
         Vector that solves Gu * w + Gp = 0
     w_1 : ndarray
-        Nullvector of [Gu | Gp] obtained by appending a 1 to w.
+        Unit nullvector of [Gu | Gp] obtained by appending a 1 to w.
     """
     phi_0 = np.eye(M)[:,0]
     phi_objective = lambda y: 0.5*np.dot(Gu(y), Gu(y))
@@ -148,6 +148,7 @@ def _computeNullspace(Gu : Callable[[np.ndarray], np.ndarray],
     min_result = opt.minimize(w_objective, np.zeros(M), method="BFGS", options={"eps": r_diff})
     w = min_result.x
     w_1 = np.append(w, 1.0)
+    w_1 = w_1 / lg.norm(w_1)
 
     return phi, w, w_1
 
