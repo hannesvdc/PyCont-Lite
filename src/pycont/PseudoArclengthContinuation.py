@@ -21,7 +21,7 @@ class Event:
 @dataclass
 class Branch:
 	id: int
-	from_event: Optional[Event]
+	from_event: Optional[int]
 	termination_event: Event
 	u_path: np.ndarray
 	p_path: np.ndarray

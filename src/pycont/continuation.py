@@ -97,11 +97,11 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     tangent = pac.computeTangent(u0, p0, Gu_v, Gp, initial_tangent, M, tolerance)
 
     # Do continuation in both directions of the tangent
-    starting_event = pac.Event("SP", u0, p0)
     result = ContinuationResult()
+    starting_event = pac.Event("SP", u0, p0)
     result.events.append(starting_event)
-    _recursiveContinuation(G, Gu_v, Gp, u0, p0,  tangent, M, ds_min, ds_max, ds_0, n_steps, sp, starting_event, result)
-    _recursiveContinuation(G, Gu_v, Gp, u0, p0, -tangent, M, ds_min, ds_max, ds_0, n_steps, sp, starting_event, result)
+    _recursiveContinuation(G, Gu_v, Gp, u0, p0,  tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+    _recursiveContinuation(G, Gu_v, Gp, u0, p0, -tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
 
     # Return all found branches and bifurcation points
     return result
@@ -118,7 +118,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                            ds : float, 
                            n_steps : int, 
                            sp : Dict[str, Any],
-                           from_event : pac.Event,
+                           from_event : int,
                            result : ContinuationResult) -> None:
     """
     Internal function that performs pseudo-arclength continuation on the current branch. When the
@@ -172,16 +172,17 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     branch.from_event = from_event
     result.branches.append(branch)
     result.events.append(termination_event)
+    termination_event_index = len(result.events)-1
 
     if termination_event.kind != "LP" and termination_event.kind != "BP":
         return
-    
-    # If the last point on the previous brancg was a fold point, just continue that branch
+
+    # If the last point on the previous branch was a fold point, create a new segment where the last one ended.
     elif termination_event.kind == "LP":
         u_final = termination_event.u
         p_final = termination_event.p
         final_tangent = termination_event.info["tangent"]
-        _recursiveContinuation(G, Gu_v, Gp, u_final, p_final, final_tangent, M, ds_min, ds_max, ds, n_steps, sp, termination_event, result)
+        _recursiveContinuation(G, Gu_v, Gp, u_final, p_final, final_tangent, M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
 
     # If there are no bifurcation points on this path, return
     elif termination_event.kind == "BP":
@@ -204,4 +205,4 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         # For each of the branches, run pseudo-arclength continuation
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], tangents[n], M, ds_min, ds_max, ds, n_steps, sp, termination_event, result)
+            _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], tangents[n], M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
