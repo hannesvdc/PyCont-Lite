@@ -158,7 +158,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     sp : dict
         Additional paramters for PyCont.
     from_event : int
-        Integer index of the event that spawned this event (initially a starting point with index 0).
+        Index of the event that spawned this event (initially a starting point with index 0).
     result: ContinuationResult
         Object that contains all continued branches and detected bifurcation points.
 

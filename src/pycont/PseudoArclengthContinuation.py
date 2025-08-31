@@ -27,6 +27,13 @@ class Branch:
 	p_path: np.ndarray
 	info: Dict = field(default_factory=dict)
 
+def _makeBranch(id, termination_event, u_path, p_path):
+	"""
+	Internal function to create a Branch dataclass instance from the
+	current continuation data.
+	"""
+	return Branch(id, None, termination_event, u_path, p_path)
+
 def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
 	"""
 	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
@@ -181,8 +188,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M])
-			branch = Branch(branch_id, None, termination_event, u_path, p_path)
-			return branch, termination_event
+			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
 		# Do a simple fold detection
 		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
@@ -202,8 +208,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					u_path[n,:] = x_singular[0:M]
 					p_path[n] = x_singular[M]
 					termination_event = Event("BP", x_singular[0:M], x_singular[M])
-					branch = Branch(branch_id, None, termination_event, u_path[:n+1,:], p_path[:n+1])
-					return branch, termination_event
+					return _makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
 				
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
@@ -219,8 +224,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		print(print_str)
 
 	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
-	branch = Branch(branch_id, None, termination_event, u_path, p_path)
-	return branch, termination_event
+	return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
 def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vector_prev, max_bisect_steps=30):
 	"""
