@@ -16,7 +16,7 @@ def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray],
 	Main test function to detect a bifurcation point. Bifurcation points are 
 	locations x = (u, p) where Gu becomes singular and Gp lies in the column
 	space of Gu. A bifurcation point is detected when the solution y to the bordered
-	system [dF_w  r ; l^T 0] y = e_{M+1} switches sign in the last component y[M+1].
+	system [dF_w  r ; l^T 0] y = e_{M+2} switches sign in the last component y[M+1].
 
 	Parameters
 	----------
@@ -51,11 +51,11 @@ def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray],
 		- A simple polynomial preconditioner of maximum order min(M, 10) is used to speed up
 		  the L-GMRES solver for large-scale systems.
 		- Spurious sign changes can happen at a fold point then the Jacobian Gu becomes
-		  ill-conditioned. Further checks must be done to classify fold points from real
-		  bifurcation points (implemented in PseudoArclengthContinuation.py).
+		  ill-conditioned and ||y|| explodes. Further checks must be done to classify 
+		  fold points from real bifurcation points (implemented in PseudoArclengthContinuation.py).
 		- Although this test function detects some fold points, it cannot be reliably
 		  used to detect fold points in general
-		- e_{M+1} is the M+1 - unit vector.
+		- e_{M+2} is the M+2 - unit vector.
 	"""
 
 	def matvec(w):

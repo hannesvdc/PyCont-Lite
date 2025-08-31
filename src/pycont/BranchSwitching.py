@@ -185,7 +185,7 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
         Tangent vectors at the new branches in the starting points.
     """
     print('\nBranch Switching')
-    
+
     # Setting up variables
     M = x_singular.size - 1
     u = x_singular[0:M]
@@ -223,7 +223,6 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
             idx = n
     directions.pop(idx)
     tangents.pop(idx)
-    print('Branch Switching Directions:', directions)
     print('Branch Switching Tangents:', tangents)
 
     # Returning 3 continuation directions
