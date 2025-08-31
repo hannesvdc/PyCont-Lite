@@ -7,14 +7,13 @@ import scipy.optimize as opt
 from . import TestFunctions as tf
 
 from dataclasses import dataclass, field
-from typing import Callable, List, Tuple, Dict, Literal, Any, Optional
+from typing import Callable, Tuple, Dict, Literal, Any, Optional
 
 EventKind = Literal["SP", "LP", "BP", "DSFLOOR", "MAXSTEPS"]
 
 @dataclass
 class Event:
 	kind: EventKind
-	branch_id: int
 	u: np.ndarray
 	p: float
 	info: Dict = field(default_factory=dict)
@@ -22,10 +21,10 @@ class Event:
 @dataclass
 class Branch:
 	id: int
-	from_event: Optional[int]
-	termination_event: int
-	p: np.ndarray
-	u: np.ndarray
+	from_event: Optional[Event]
+	termination_event: Event
+	u_path: np.ndarray
+	p_path: np.ndarray
 	info: Dict = field(default_factory=dict)
 
 def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
@@ -76,8 +75,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
                  ds_min : float, 
                  ds_max : float, 
                  ds : float, 
-                 n_steps : int, 
-                 sp : Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray, List]:
+                 n_steps : int,
+				 branch_id : int,
+                 sp : Dict[str, Any]) -> Tuple[Branch, Event]:
 	
 	"""
     Function that performs the actual pseudo-arclength continuation of the current branch. It starts
@@ -113,18 +113,19 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
         Initial continuation step size.
     n_steps : int
         Maximum number of continuation steps to perform.
+	branch_id : int
+		Integer identifier of the current branch.
     sp : dict
 		Additional paramters for PyCont.
 
     Returns
     -------
-    u_path: ndarray
-		Two-dimensional array containining all state vectors along the branch in the first dimension.
-		Size is (n, M) where n is the number of continuation points along the branch.
-	p_path: ndarray
-		One-dimensional array containining all parameter values along the branch.
-	bifurcation_points: List
-		Contains the bifurcation point, empty if none was detected.
+	branch : Branch
+		An instance of `Branch` that stores the complete branch and the reason it terminated, see the Branch dataclass
+	event : Event
+		An instance of `Event` that stores the reason why continuation terminated, as well as the location of the final
+		point. Reasons include "BP" for a bifurcation point, "LP" for a fold, "MAXSTEPS" if we reached `n_steps` on the
+		current branch, or "DSFLOOR" if the current arc length `ds` dips below `ds_min` and continuation failed due to this. 
     """    
 	
 	# Infer parameters from inputs
@@ -136,9 +137,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
+	prev_tangent = initial_tangent / lg.norm(initial_tangent)
+
+	# Initialize the storage arrays
 	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u0
 	p_path = np.zeros(n_steps+1); p_path[0] = p0
-	prev_tangent = initial_tangent / lg.norm(initial_tangent)
 
 	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {prev_tangent[M]:.4f}"
 	print(print_str)
@@ -177,11 +180,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
-			return u_path[0:n,:], p_path[0:n], []
+			termination_event = Event("DSFLOOR", x[0:M], x[M])
+			branch = Branch(branch_id, None, termination_event, u_path, p_path)
+			return branch, termination_event
 
 		# Do a simple fold detection
 		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
 			print('Fold point near', x_new)
+
+			# TODO Pinpoint the location of the fold point and return
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
@@ -192,7 +199,12 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, x, x_new, l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
-					return u_path[0:n,:], p_path[0:n], [x_singular]
+					u_path[n,:] = x_singular[0:M]
+					p_path[n] = x_singular[M]
+					termination_event = Event("BP", x_singular[0:M], x_singular[M])
+					branch = Branch(branch_id, None, termination_event, u_path[:n+1,:], p_path[:n+1])
+					return branch, termination_event
+				
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 
@@ -206,7 +218,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
-	return u_path, p_path, []
+	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
+	branch = Branch(branch_id, None, termination_event, u_path, p_path)
+	return branch, termination_event
 
 def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vector_prev, max_bisect_steps=30):
 	"""
