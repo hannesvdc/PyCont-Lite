@@ -6,7 +6,27 @@ import scipy.optimize as opt
 
 from . import TestFunctions as tf
 
-from typing import Callable, List, Tuple, Dict, Any
+from dataclasses import dataclass, field
+from typing import Callable, List, Tuple, Dict, Literal, Any, Optional
+
+EventKind = Literal["SP", "LP", "BP", "DSFLOOR", "MAXSTEPS"]
+
+@dataclass
+class Event:
+	kind: EventKind
+	branch_id: int
+	u: np.ndarray
+	p: float
+	info: Dict = field(default_factory=dict)
+
+@dataclass
+class Branch:
+	id: int
+	from_event: Optional[int]
+	termination_event: int
+	p: np.ndarray
+	u: np.ndarray
+	info: Dict = field(default_factory=dict)
 
 def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
 	"""
