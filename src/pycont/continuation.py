@@ -157,6 +157,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         Maximum number of continuation steps to perform.
     sp : dict
         Additional paramters for PyCont.
+    from_event : int
+        Integer index of the event that spawned this event (initially a starting point with index 0).
     result: ContinuationResult
         Object that contains all continued branches and detected bifurcation points.
 
@@ -189,7 +191,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         x_singular = np.append(termination_event.u, termination_event.p)
     
         # If there are bifurcation points, check if it is unique
-        for n in range(len(result.events)):
+        for n in range(len(result.events) - 1): # Do not check with yourself
             if result.events[n].kind != "BP":
                 continue
 

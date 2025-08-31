@@ -18,7 +18,6 @@ def FoldTest():
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))
-	print('Bifurcation Points:', continuation_result.bifurcation_points)
 
 	# Plot the curves
 	fig = plt.figure()
@@ -29,7 +28,7 @@ def FoldTest():
 	ax.plot(0.0*y_grid, y_grid, 'lightgray')
 	for n in range(len(continuation_result.branches)):
 		branch = continuation_result.branches[n]
-		ax.plot(branch['p'], branch['u'][:,0], 'blue')
+		ax.plot(branch.p_path, branch.u_path[:,0], 'blue')
 	ax.plot(p0, u0, 'go', label='SP')
 	ax.set_xlabel(r'$r$')
 	ax.set_ylabel(r'$u$', rotation=0)

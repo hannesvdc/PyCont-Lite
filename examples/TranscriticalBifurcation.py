@@ -18,7 +18,6 @@ def TransCriticalTest():
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))
-	print('Bifurcation Points:', continuation_result.bifurcation_points)
 
 	fig = plt.figure()
 	ax = fig.gca()
@@ -28,10 +27,12 @@ def TransCriticalTest():
 	ax.plot(0.0*y_grid, y_grid, 'lightgray')
 	for n in range(len(continuation_result.branches)):
 		branch = continuation_result.branches[n]
-		ax.plot(branch['p'], branch['u'][:,0], 'blue')
-	ax.plot(p0, u0, 'go', label='SP')
-	for n in range(len(continuation_result.bifurcation_points)):
-		ax.plot(continuation_result.bifurcation_points[n][1], continuation_result.bifurcation_points[n][0], 'ro', label='BP')
+		ax.plot(branch.p_path, branch.u_path[:,0], 'blue')
+	for event in continuation_result.events:
+		if event.kind == "SP":
+			ax.plot(event.p, event.u, 'go', label=event.kind)
+		elif event.kind == "BP":
+			ax.plot(event.p, event.u, 'ro', label=event.kind)
 	ax.set_xlabel(r'$r$')
 	ax.set_ylabel(r'$u$')
 	ax.legend(loc='upper left')
