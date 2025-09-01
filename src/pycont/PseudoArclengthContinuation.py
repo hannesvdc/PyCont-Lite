@@ -144,27 +144,25 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
-	prev_tangent = initial_tangent / lg.norm(initial_tangent)
+	tangent = initial_tangent / lg.norm(initial_tangent)
 
 	# Initialize the storage arrays
 	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u0
 	p_path = np.zeros(n_steps+1); p_path[0] = p0
 
-	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {prev_tangent[M]:.4f}"
+	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {tangent[M]:.4f}"
 	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
 	rng = rd.RandomState()
 	r = rng.normal(0.0, 1.0, M+1)
 	l = rng.normal(0.0, 1.0, M+1)
-	r = r - np.dot(r, prev_tangent) * prev_tangent; r = r / lg.norm(r)
-	l = l - np.dot(l, prev_tangent) * prev_tangent; l = l / lg.norm(l)
+	r = r - np.dot(r, tangent) * tangent; r = r / lg.norm(r)
+	l = l - np.dot(l, tangent) * tangent; l = l / lg.norm(l)
 	prev_tau_value = 0.0
 	prev_tau_vector = None
 
 	for n in range(1, n_steps+1):
-		# Determine the tangent to the curve at current point
-		tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, prev_tangent, M, a_tol)
 
 		# Create the extended system for corrector
 		N = lambda q: np.dot(tangent, q - x) - ds
@@ -189,10 +187,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			print('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M])
 			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+		
+		# Determine the tangent to the curve at current point
+		# TODO tangent should be computed after x_new was determined!!
+		# Call it tangent and new_tangent.
+		new_tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, tangent, M, a_tol)
 
 		# TODO check if this fold check is at the right location.
-		if tangent[M] * prev_tangent[M] < 0.0 and n > 1:
-			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, prev_tangent[M], tangent[M], tangent, ds, M, sp)
+		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
+			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
 			print('Fold point at', x_fold)
 
 			# Append the fold point and x_new to the current path
@@ -202,7 +205,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			p_path[n+1] = x_new[M]
 			
 			# Stop continuation along this branch
-			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": tangent})
+			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
 			return _makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
 
 		# Do bifurcation detection in the new point
@@ -223,7 +226,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			prev_tau_vector = tau_vector
 
 		# Bookkeeping for the next step
-		prev_tangent = np.copy(tangent)
+		tangent = np.copy(new_tangent)
 		x = np.copy(x_new)
 		u_path[n,:] = x[0:M]
 		p_path[n] = x[M]
@@ -324,7 +327,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 		return tangent[M], x_alpha
 	
 	alpha_left, alpha_right = 0.0, 1.0
-	for step in range(max_bisect_steps):
+	for _ in range(max_bisect_steps):
 		alpha = 0.5 * (alpha_left + alpha_right)
 		value, x_alpha = finalTangentComponent(alpha)
 
