@@ -286,3 +286,49 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 
 	print('Warning: Bisection reached maximum steps without full convergence.')
 	return True, 0.5 * (x_start + x_end)
+
+# TODO Write this algorithm out on paper
+def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
+							Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
+                 			Gp : Callable[[np.ndarray, float], np.ndarray], 
+							x_left : np.ndarray,
+							x_right : np.ndarray,
+							value_left : float,
+							value_right : float,
+							tangent_ref : np.ndarray,
+							ds : float,
+							M : int,
+							sp : Dict,
+							max_bisect_steps=30):
+	
+	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
+		ds_alpha = alpha * ds
+		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		return F
+	def finalTangentComponent(alpha):
+		F = make_F_ext(alpha)
+		x_alpha = opt.newton_krylov(F, x_left, rdiff=sp["rdiff"])
+		tangent = computeTangent(x_alpha[0:M], x_alpha[M], Gu_v, Gp, tangent_ref, M, sp["tolerance"])
+		return tangent[M], x_alpha
+	
+	alpha_left, alpha_right = 0.0, 1.0
+	for step in range(max_bisect_steps):
+		alpha = 0.5 * (alpha_left + alpha_right)
+		value, x_alpha = finalTangentComponent(alpha)
+
+		if value * value_left < 0.0:
+			alpha_right = alpha
+			value_right = value
+			x_right = x_alpha
+		else:
+			alpha_left = alpha
+			value_left = value
+			x_left = x_alpha
+
+		# Convergence check
+		if lg.norm(x_left - x_right) < sp["tolerance"]:
+			return 0.5 * (x_left + x_right)
+		
+	print('Warning: Bisection reached maximum steps without full convergence.')
+	return 0.5 * (x_left + x_right)
