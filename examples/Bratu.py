@@ -41,8 +41,13 @@ def BratuTest():
     for branch in continuation_result.branches:
         max_u = np.sign(branch.u_path[:, 50]) * np.max(np.abs(branch.u_path), axis=1)
         plt.plot(branch.p_path, max_u, color="tab:blue")
-    plt.plot(lam0, np.max(u0), 'go', label='SP')
-    plt.xlabel(r"$\lambda$")
+    for event in continuation_result.events:
+        if event.kind == "SP":
+            plt.plot(event.p, event.u, 'go', label=event.kind)
+        elif event.kind == "LP":
+            plt.plot(event.p, event.u, 'bo', label=event.kind)
+        elif event.kind == "BP":
+            plt.plot(event.p, event.u, 'ro', label=event.kind)
     plt.ylabel(r"$u(x)$")
     plt.legend()
     plt.show()
