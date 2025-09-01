@@ -66,6 +66,9 @@ def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
 		The absolute tolerance for L-GMRES
 
 	Returns
+	-------
+	tangent : ndarray
+		The tangent vector at (u, p).
 	"""
 
 	DG = slg.LinearOperator((M, M), lambda v: Gu_v(u, p, v))
