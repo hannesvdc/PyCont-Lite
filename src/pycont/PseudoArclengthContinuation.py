@@ -34,6 +34,13 @@ def _makeBranch(id, termination_event, u_path, p_path):
 	"""
 	return Branch(id, None, termination_event, u_path, p_path)
 
+def _Gu_v_cached(G : Callable[[np.ndarray, float], np.ndarray], 
+				 u : np.ndarray, 
+				 p : float,
+				 rdiff : float) : 
+	base_value = G(u, p)
+	return lambda v : (G(u + rdiff * v, p) - base_value) / rdiff
+
 def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
 	"""
 	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
@@ -189,11 +196,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 		
 		# Determine the tangent to the curve at current point
-		# TODO tangent should be computed after x_new was determined!!
-		# Call it tangent and new_tangent.
 		new_tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, tangent, M, a_tol)
 
-		# TODO check if this fold check is at the right location.
+		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
 			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
 			print('Fold point at', x_fold)
