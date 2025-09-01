@@ -238,7 +238,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
 	return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
-def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vector_prev, max_bisect_steps=30):
+def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray], 
+								   x_start : np.ndarray, 
+								   x_end : np.ndarray, 
+								   l : np.ndarray, 
+								   r : np.ndarray, 
+								   M : int, 
+								   a_tol : float, 
+								   tau_vector_prev : Optional[np.ndarray], 
+								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
 	"""
 	Localizes the bifurcation point between x_start and x_end using the bisection method.
 
@@ -259,7 +267,7 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
         a_tol : float
 			Absolute tolerance for Newton solver
         tau_vector_prev : ndarray
-			Previous tau_vector in x_start used for bifurcation detection.
+			Previous tau_vector in x_start used for bifurcation detection, can be None.
         max_bisect_steps : int
 			Maximum allowed number of bisection steps.
 
@@ -311,6 +319,48 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							M : int,
 							sp : Dict,
 							max_bisect_steps : int=30) -> np.ndarray:
+	"""
+	Localizes the fold point between x_left and x_right using the bisection method.
+
+    Parameters
+	----------
+        G : callable
+			Function representing the nonlinear system, with signature
+			``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+			is the continuation parameter.
+		Gu_v : callable
+			Function calculating the Jacobian of G using matrix-free directional derivatives, 
+			with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
+			is the continuation parameter, and `v` is the differentiation direction.
+		Gp : callable
+			Function calculating the derivative of G with respect to the parameter,
+			with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+			is the continuation parameter.
+        x_left : ndarray 
+			Starting point (u, p) to the 'left' of the bifurcation point.
+        x_right : ndarray 
+			End point (u, p) to the 'right' of the bifurcation point.
+        value_left : float
+			Tangent value at x_left.
+		value_right : float
+			Tangent value at x_right.
+		tangent_ref : np.ndarray
+			Reference tangent (typically at x_left) to speed up tangent computations.
+		ds : float
+			Total arclength between x_left and x_right.
+        M : int
+			Dimension of u.
+        sp : Dict
+			Solver parameters.
+        max_bisect_steps : int
+			Maximum allowed number of bisection steps.
+
+    Returns
+	-------
+        x_fold: ndarray
+			The location of the fold point within the tolerance a_tol.
+    """
+
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
 		return x_left
