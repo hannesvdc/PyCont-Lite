@@ -6,32 +6,80 @@ import scipy.optimize as opt
 
 from . import TestFunctions as tf
 
-from typing import Callable, List, Tuple, Dict, Any
+from dataclasses import dataclass, field
+from typing import Callable, Tuple, Dict, Literal, Any, Optional
 
-def computeTangent(u, p, Gu_v, Gp, prev_tau, M, a_tol):
+EventKind = Literal["SP", "LP", "BP", "DSFLOOR", "MAXSTEPS"]
+
+@dataclass
+class Event:
+	kind: EventKind
+	u: np.ndarray
+	p: float
+	info: Dict = field(default_factory=dict)
+
+@dataclass
+class Branch:
+	id: int
+	from_event: Optional[int]
+	termination_event: Event
+	u_path: np.ndarray
+	p_path: np.ndarray
+	info: Dict = field(default_factory=dict)
+
+def _makeBranch(id, termination_event, u_path, p_path):
 	"""
-	This function computes the tangent to the curve at a given point by solving D_u G * tau = - G_p.
-	The tangent vector then is [tau, 1] with normalization.
+	Internal function to create a Branch dataclass instance from the
+	current continuation data.
+	"""
+	return Branch(id, None, termination_event, u_path, p_path)
 
-	The arguments are:
-		- u: The current state variable
-		- p: The current parameter
-		- Gu_v: The Jacobian of the system with respect to the state variable as a function of u, p, v
-		- Gp: The Jacobian of the system with respect to the parameter as a function of u and p
-		- prev_tau: The previous tangent vector (used for initial guess)
-		- M: The size of the state variable
-		- a_tol: The absolute tolerance for the Newton-Raphson solver
+def _Gu_v_cached(G : Callable[[np.ndarray, float], np.ndarray], 
+				 u : np.ndarray, 
+				 p : float,
+				 rdiff : float) : 
+	base_value = G(u, p)
+	return lambda v : (G(u + rdiff * v, p) - base_value) / rdiff
+
+def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
+	"""
+	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
+	The tangent vector then is [tau, 1] with normalization, and in the direction of prev_tangent.
+
+	Parameters:
+	----------
+	u: ndarray
+		The current state variable
+	p: float 
+		The current parameter value
+	Gu_v: Callable
+		The Matrix-free Jacobian of G(u,p) in the direction of v.
+	Gp : callable
+        Function calculating the derivative of G with respect to the parameter,
+        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+	prev_tangent : ndarray
+		The previous tangent vector along the curve (used for initial guess)
+	M : int
+		The size of the state variable
+	a_tol: float
+		The absolute tolerance for L-GMRES
+
+	Returns
+	-------
+	tangent : ndarray
+		The tangent vector at (u, p).
 	"""
 
 	DG = slg.LinearOperator((M, M), lambda v: Gu_v(u, p, v))
 	b = -Gp(u, p)
 
-	tau = slg.lgmres(DG, b, x0=prev_tau[:M], atol=a_tol)[0]
+	tau = slg.lgmres(DG, b, x0=prev_tangent[:M], atol=a_tol)[0]
 	tangent = np.append(tau, 1.0)
 	tangent = tangent / lg.norm(tangent)
 
 	# Make sure the new tangent vector points in the same rough direction as the previous one
-	if np.dot(tangent, prev_tau) < 0.0:
+	if np.dot(tangent, prev_tangent) < 0.0:
 		tangent = -tangent
 	return tangent
 
@@ -44,8 +92,59 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
                  ds_min : float, 
                  ds_max : float, 
                  ds : float, 
-                 n_steps : int, 
-                 sp : Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray, List]:
+                 n_steps : int,
+				 branch_id : int,
+                 sp : Dict[str, Any]) -> Tuple[Branch, Event]:
+	
+	"""
+    Function that performs the actual pseudo-arclength continuation of the current branch. It starts
+	at the initial point (u0, p0), calculates the tangent along the curve, predicts the next points and
+	corrects it using a matrix-free Newton-Krylov solver. At every iteration it checks for fold and
+	bifurcation points.
+
+    Parameters
+    ----------
+    G : callable
+        Function representing the nonlinear system, with signature
+        ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    Gu_v : callable
+        Function calculating the Jacobian of G using matrix-free directional derivatives, 
+        with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
+        is the continuation parameter, and `v` is the differentiation direction.
+    Gp : callable
+        Function calculating the derivative of G with respect to the parameter,
+        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    u0 : ndarray
+        Initial solution vector corresponding to the starting parameter `p0`.
+    p0 : float
+        Initial value of the continuation parameter.
+    initial_tangent : ndarray
+        Tangent to the current branch in (u0, p0)
+    ds_min : float
+        Minimum allowable continuation step size.
+    ds_max : float
+        Maximum allowable continuation step size.
+    ds : float
+        Initial continuation step size.
+    n_steps : int
+        Maximum number of continuation steps to perform.
+	branch_id : int
+		Integer identifier of the current branch.
+    sp : dict
+		Additional paramters for PyCont.
+
+    Returns
+    -------
+	branch : Branch
+		An instance of `Branch` that stores the complete branch and the reason it terminated, see the Branch dataclass
+	event : Event
+		An instance of `Event` that stores the reason why continuation terminated, as well as the location of the final
+		point. Reasons include "BP" for a bifurcation point, "LP" for a fold, "MAXSTEPS" if we reached `n_steps` on the
+		current branch, or "DSFLOOR" if the current arc length `ds` dips below `ds_min` and continuation failed due to this. 
+    """    
+	
 	# Infer parameters from inputs
 	M = u0.size
 	a_tol = sp["tolerance"]
@@ -54,47 +153,40 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	bifurcation_detection = sp["bifurcation_detection"]
 
 	# Initialize a point on the path
-	u = np.copy(u0) # Always the previous point on the curve
-	p = np.copy(p0)	# Always the previous point on the curve
-	u_path = [u]
-	p_path = [p]
+	x = np.append(u0, p0)
+	tangent = initial_tangent / lg.norm(initial_tangent)
 
-	# Choose intial tangent (guess). We need to negate to find the actual search direction
-	prev_tangent = -initial_tangent / lg.norm(initial_tangent)
+	# Initialize the storage arrays
+	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u0
+	p_path = np.zeros(n_steps+1); p_path[0] = p0
 
-	print_str = f"Step n: {0:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {prev_tangent[M]:.4f}"
+	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {tangent[M]:.4f}"
 	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
 	rng = rd.RandomState()
 	r = rng.normal(0.0, 1.0, M+1)
 	l = rng.normal(0.0, 1.0, M+1)
-	r = r - np.dot(r, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	l = l - np.dot(l, prev_tangent) / np.dot(prev_tangent, prev_tangent) * prev_tangent
-	r = r / lg.norm(r)
-	l = l / lg.norm(l)
+	r = r - np.dot(r, tangent) * tangent; r = r / lg.norm(r)
+	l = l - np.dot(l, tangent) * tangent; l = l / lg.norm(l)
 	prev_tau_value = 0.0
 	prev_tau_vector = None
 
 	for n in range(1, n_steps+1):
-		# Determine the tangent to the curve at current point
-		tangent = computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol)
 
 		# Create the extended system for corrector
-		N = lambda x: np.dot(tangent, x - np.append(u, p)) + ds
-		F = lambda x: np.append(G(x[0:M], x[M]), N(x))
-		dF_w = lambda x, w: (F(x + r_diff * w) - F(x)) / r_diff
+		N = lambda q: np.dot(tangent, q - x) - ds
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		dF_w = lambda q, w: (F(q + r_diff * w) - F(q)) / r_diff
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
 			# Predictor: Follow the tangent vector
-			u_p = u + tangent[0:M] * ds
-			p_p = p + tangent[M]   * ds
-			x_p = np.append(u_p, p_p)
+			x_p = x + tangent * ds
 
 			# Corrector: Newton-Krylov
 			try:
-				x_result = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
+				x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				ds = min(1.2*ds, ds_max)
 				break
 			except:
@@ -103,56 +195,96 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
-			return np.array(u_path), np.array(p_path), []
-		u_new = x_result[0:M]
-		p_new = x_result[M]
+			termination_event = Event("DSFLOOR", x[0:M], x[M])
+			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+		
+		# Determine the tangent to the curve at current point
+		new_tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, tangent, M, a_tol)
 
-		# Do a simple fold detection
-		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
-			print('Fold point near', np.append(u_new, p_new))
+		# Check whether we passed a fold point.
+		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
+			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
+			print('Fold point at', x_fold)
+
+			# Append the fold point and x_new to the current path
+			u_path[n,:] = x_fold[0:M]
+			p_path[n] = x_fold[M]
+			u_path[n+1,:] = x_new[0:M]
+			p_path[n+1] = x_new[M]
+			
+			# Stop continuation along this branch
+			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
+			return _makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
-			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, np.append(u_new, p_new), l, r, M, prev_tau_vector)
+			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, x_new, l, r, M, prev_tau_vector)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, np.append(u, p), np.append(u_new, p_new), l, r, M, a_tol, prev_tau_vector)
+				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, x, x_new, l, r, M, a_tol, prev_tau_vector)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
-					return np.array(u_path), np.array(p_path), [x_singular]
+					u_path[n,:] = x_singular[0:M]
+					p_path[n] = x_singular[M]
+					termination_event = Event("BP", x_singular[0:M], x_singular[M])
+					return _makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
+				
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
 
 		# Bookkeeping for the next step
-		prev_tangent = np.copy(tangent)
-		u = np.copy(u_new)
-		p = np.copy(p_new)
-		u_path.append(u)
-		p_path.append(p)
+		tangent = np.copy(new_tangent)
+		x = np.copy(x_new)
+		u_path[n,:] = x[0:M]
+		p_path[n] = x[M]
 		
 		# Print the status
-		print_str = f"Step n: {n:3d}\t u: {lg.norm(u):.4f}\t p: {p:.4f}\t t_p: {tangent[M]:.4f}"
+		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
-	return np.array(u_path), np.array(p_path), []
+	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
+	return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
-def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vector_prev, max_bisect_steps=30):
+def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray], 
+								   x_start : np.ndarray, 
+								   x_end : np.ndarray, 
+								   l : np.ndarray, 
+								   r : np.ndarray, 
+								   M : int, 
+								   a_tol : float, 
+								   tau_vector_prev : Optional[np.ndarray], 
+								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
 	"""
-	Localizes the bifurcation point between x_start and x_end using bisection.
+	Localizes the bifurcation point between x_start and x_end using the bisection method.
 
-    Parameters:
-        dF_w: function for Jacobian-vector product
-        x_start: array (M+1,), start point [u, p]
-        x_end: array (M+1,), end point [u, p]
-        l, r: random bifurcation detection vectors (fixed)
-        M: dimension of u
-        a_tol: absolute tolerance for Newton solver
-        tau_vector_prev: previous tau_vector (can be None)
-        max_bisect_steps: maximum allowed bisection steps
+    Parameters
+	----------
+        dF_w: Callable
+			Function returning the Jacobian-vector product of the extended system, with signature
+			``dF_w(x, w) -> ndarray`` where `x=(u,p)` is the full state vector and `w` is the 
+			direction in which to compute the derivative
+        x_start : ndarray 
+			Starting point (u, p) to the 'left' of the bifurcation point.
+        x_end : ndarray 
+			End point (u, p) to the 'right' of the bifurcation point.
+        l, r : ndarray
+			Random vectors used during bifurcation detection.
+        M : int
+			Dimension of u.
+        a_tol : float
+			Absolute tolerance for Newton solver
+        tau_vector_prev : ndarray
+			Previous tau_vector in x_start used for bifurcation detection, can be None.
+        max_bisect_steps : int
+			Maximum allowed number of bisection steps.
 
-    Returns:
-        x_bifurcation: array (M+1,), approximated bifurcation point
+    Returns
+	-------
+		is_bf : boolean
+			True if there is an actual sign change in the test function, False for a fold point.
+        x_bifurcation: ndarray (M+1,)
+			The location of the bifurcation point within the tolerance a_tol.
     """
 
 	# Compute tau at start and end
@@ -164,7 +296,7 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 		print("No sign change detected between start and end points.")
 		return False, x_end
 
-	for step in range(max_bisect_steps):
+	for _ in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
 		_, tau_mid = tf.test_fn_bifurcation(dF_w, x_mid, l, r, M, tau_vector_prev)
 
@@ -182,3 +314,93 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 
 	print('Warning: Bisection reached maximum steps without full convergence.')
 	return True, 0.5 * (x_start + x_end)
+
+def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
+							Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
+                 			Gp : Callable[[np.ndarray, float], np.ndarray], 
+							x_left : np.ndarray,
+							x_right : np.ndarray,
+							value_left : float,
+							value_right : float,
+							tangent_ref : np.ndarray,
+							ds : float,
+							M : int,
+							sp : Dict,
+							max_bisect_steps : int=30) -> np.ndarray:
+	"""
+	Localizes the fold point between x_left and x_right using the bisection method.
+
+    Parameters
+	----------
+        G : callable
+			Function representing the nonlinear system, with signature
+			``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+			is the continuation parameter.
+		Gu_v : callable
+			Function calculating the Jacobian of G using matrix-free directional derivatives, 
+			with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
+			is the continuation parameter, and `v` is the differentiation direction.
+		Gp : callable
+			Function calculating the derivative of G with respect to the parameter,
+			with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+			is the continuation parameter.
+        x_left : ndarray 
+			Starting point (u, p) to the 'left' of the bifurcation point.
+        x_right : ndarray 
+			End point (u, p) to the 'right' of the bifurcation point.
+        value_left : float
+			Tangent value at x_left.
+		value_right : float
+			Tangent value at x_right.
+		tangent_ref : np.ndarray
+			Reference tangent (typically at x_left) to speed up tangent computations.
+		ds : float
+			Total arclength between x_left and x_right.
+        M : int
+			Dimension of u.
+        sp : Dict
+			Solver parameters.
+        max_bisect_steps : int
+			Maximum allowed number of bisection steps.
+
+    Returns
+	-------
+        x_fold: ndarray
+			The location of the fold point within the tolerance a_tol.
+    """
+
+	if value_left * value_right > 0.0:
+		print('Left and Right value have the same sign. Bisection will not work. Returning')
+		return x_left
+	
+	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
+		ds_alpha = alpha * ds
+		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		return F
+	def finalTangentComponent(alpha):
+		F = make_F_ext(alpha)
+		x_alpha = opt.newton_krylov(F, x_left, rdiff=sp["rdiff"])
+		tangent = computeTangent(x_alpha[0:M], x_alpha[M], Gu_v, Gp, tangent_ref, M, sp["tolerance"])
+		return tangent[M], x_alpha
+	
+	alpha_left, alpha_right = 0.0, 1.0
+	for _ in range(max_bisect_steps):
+		alpha = 0.5 * (alpha_left + alpha_right)
+		value, x_alpha = finalTangentComponent(alpha)
+
+		if value * value_left < 0.0:
+			alpha_right = alpha
+			value_right = value
+			x_right = x_alpha
+		else:
+			alpha_left = alpha
+			value_left = value
+			x_left = x_alpha
+
+		# Convergence check
+		if lg.norm(x_left - x_right) < sp["tolerance"]:
+			return 0.5 * (x_left + x_right)
+		
+	print('Warning: Bisection reached maximum steps without full convergence.')
+	return 0.5 * (x_left + x_right)

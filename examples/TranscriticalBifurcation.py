@@ -18,23 +18,23 @@ def TransCriticalTest():
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))
-	print('Bifurcation Points:', continuation_result.bifurcation_points)
 
-	fig = plt.figure()
-	ax = fig.gca()
 	x_grid = np.linspace(-10, 10, 1001)
 	y_grid = np.linspace(-7.5, 7.5, 1001)
-	ax.plot(x_grid, 0.0*x_grid, 'lightgray')
-	ax.plot(0.0*y_grid, y_grid, 'lightgray')
-	for n in range(len(continuation_result.branches)):
-		branch = continuation_result.branches[n]
-		ax.plot(branch['p'], branch['u'][:,0], 'blue')
-	ax.plot(p0, u0, 'go', label='SP')
-	for n in range(len(continuation_result.bifurcation_points)):
-		ax.plot(continuation_result.bifurcation_points[n][1], continuation_result.bifurcation_points[n][0], 'ro', label='BP')
-	ax.set_xlabel(r'$r$')
-	ax.set_ylabel(r'$u$')
-	ax.legend(loc='upper left')
+	plt.plot(x_grid, 0.0*x_grid, 'lightgray')
+	plt.plot(0.0*y_grid, y_grid, 'lightgray')
+	for branch in continuation_result.branches:
+		plt.plot(branch.p_path, branch.u_path[:,0], 'blue')
+	for event in continuation_result.events:
+		if event.kind == "SP":
+			plt.plot(event.p, event.u, 'go', label=event.kind)
+		elif event.kind == "LP":
+			plt.plot(event.p, event.u, 'bo', label=event.kind)
+		elif event.kind == "BP":
+			plt.plot(event.p, event.u, 'ro', label=event.kind)
+	plt.xlabel(r'$r$')
+	plt.ylabel(r'$u$')
+	plt.legend(loc='upper left')
 	plt.show()	
 
 if __name__ == '__main__':

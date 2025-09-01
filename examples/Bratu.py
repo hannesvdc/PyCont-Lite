@@ -36,15 +36,21 @@ def BratuTest():
 
     # Print some Internal info
     print('\nNumber of Branches:', len(continuation_result.branches))
-    print('Bifurcation Points:', continuation_result.bifurcation_points)
 
     # Plot the bifurcation diagram (lambda, max(u))
     for branch in continuation_result.branches:
-        max_u = np.sign(branch["u"][:, 50]) * np.max(np.abs(branch["u"]), axis=1)
-        plt.plot(branch["p"], max_u, color="tab:blue")
-    plt.plot(lam0, np.max(u0), 'go', label='SP')
-    plt.xlabel(r"$\lambda$")
+        max_u = np.sign(branch.u_path[:, 50]) * np.max(np.abs(branch.u_path), axis=1)
+        plt.plot(branch.p_path, max_u, color="tab:blue")
+    for event in continuation_result.events:
+        u_value = np.max(np.abs(event.u)) * np.sign(event.u)
+        if event.kind == "SP":
+            plt.plot(event.p, u_value, 'go', label=event.kind)
+        elif event.kind == "LP":
+            plt.plot(event.p, u_value, 'bo', label=event.kind)
+        elif event.kind == "BP":
+            plt.plot(event.p, u_value, 'ro', label=event.kind)
     plt.ylabel(r"$u(x)$")
+    plt.legend()
     plt.show()
 
 if __name__ == '__main__':

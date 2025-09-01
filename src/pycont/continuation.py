@@ -5,13 +5,13 @@ import scipy.optimize as opt
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
 
+from dataclasses import dataclass, field
 from typing import Callable, Optional, Dict, List, Any
 
+@dataclass
 class ContinuationResult:
-    """Holds continuation output."""
-    def __init__(self):
-        self.branches : List[Dict[str, np.ndarray]] = []
-        self.bifurcation_points : List[np.ndarray] = []
+    branches: List[pac.Branch] = field(default_factory=list)
+    events: List[pac.Event] = field(default_factory=list)
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,
@@ -98,8 +98,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
-    _recursiveContinuation(G, Gu_v, Gp, u0, p0,  tangent, M, ds_min, ds_max, ds_0, n_steps, sp, result)
-    _recursiveContinuation(G, Gu_v, Gp, u0, p0, -tangent, M, ds_min, ds_max, ds_0, n_steps, sp, result)
+    starting_event = pac.Event("SP", u0, p0)
+    result.events.append(starting_event)
+    _recursiveContinuation(G, Gu_v, Gp, u0, p0,  tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+    _recursiveContinuation(G, Gu_v, Gp, u0, p0, -tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
 
     # Return all found branches and bifurcation points
     return result
@@ -115,30 +117,94 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                            ds_max : float, 
                            ds : float, 
                            n_steps : int, 
-                           sp : Dict[str, Any], 
+                           sp : Dict[str, Any],
+                           from_event : int,
                            result : ContinuationResult) -> None:
-    print('\n\nContinuation on Branch', len(result.branches) + 1)
+    """
+    Internal function that performs pseudo-arclength continuation on the current branch. When the
+    continuation routine returns, this method calls the branch-switching routine in case of a
+    bifurcation point. If so, it calls itself recursively on each of the three new branches. 
+
+    Parameters
+    ----------
+    G : callable
+        Function representing the nonlinear system, with signature
+        ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    Gu_v : callable
+        Function calculating the Jacobian of G using matrix-free directional derivatives, 
+        with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
+        is the continuation parameter, and `v` is the differentiation direction.
+    Gp : callable
+        Function calculating the derivative of G with respect to the parameter,
+        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    u0 : ndarray
+        Initial solution vector corresponding to the starting parameter `p0`.
+    p0 : float
+        Initial value of the continuation parameter.
+    tangent : ndarray
+        Tangent to the current branch in (u0, p0)
+    M : int
+        Size of the state variable u
+    ds_min : float
+        Minimum allowable continuation step size.
+    ds_max : float
+        Maximum allowable continuation step size.
+    ds : float
+        Initial continuation step size.
+    n_steps : int
+        Maximum number of continuation steps to perform.
+    sp : dict
+        Additional paramters for PyCont.
+    from_event : int
+        Index of the event that spawned this event (initially a starting point with index 0).
+    result: ContinuationResult
+        Object that contains all continued branches and detected bifurcation points.
+
+    Returns
+    -------
+    Nothing, but `result` is updated with the new branche(s) and possible bifurcation points.
+    """
+    branch_id = len(result.branches)
+    print('\n\nContinuation on Branch', branch_id + 1)
     
     # Do regular continuation on this branch
-    u_path, p_path, bf_points = pac.continuation(G, Gu_v, Gp, u0, p0, tangent, ds_min, ds_max, ds, n_steps, sp)
-    result.branches.append({'u': u_path, 'p': p_path})
+    branch, termination_event = pac.continuation(G, Gu_v, Gp, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, sp)
+    branch.from_event = from_event
+    result.branches.append(branch)
+    result.events.append(termination_event)
+    termination_event_index = len(result.events)-1
+
+    if termination_event.kind != "LP" and termination_event.kind != "BP":
+        return
+
+    # If the last point on the previous branch was a fold point, create a new segment where the last one ended.
+    elif termination_event.kind == "LP":
+        u_final = termination_event.u
+        p_final = termination_event.p
+        final_tangent = termination_event.info["tangent"]
+        _recursiveContinuation(G, Gu_v, Gp, u_final, p_final, final_tangent, M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
 
     # If there are no bifurcation points on this path, return
-    if len(bf_points) == 0:
-       return
+    elif termination_event.kind == "BP":
+        x_singular = np.append(termination_event.u, termination_event.p)
     
-    # If there are bifurcation points, check if it is unique
-    x_singular = bf_points[0]
-    for n in range(len(result.bifurcation_points)):
-        if lg.norm(x_singular - result.bifurcation_points[n]) / M < 1.e-4:
-            return
-    result.bifurcation_points.append(x_singular)
-        
-    # The bifurcation point is unique, do branch switching
-    x_prev = np.append(u_path[-10,:], p_path[-10]) # x_prev just needs to be a point on the previous path close to the bf point
-    directions, tangents = brs.branchSwitching(G, Gu_v, Gp, x_singular, x_prev, sp)
+        # If there are bifurcation points, check if it is unique
+        for n in range(len(result.events) - 1): # Do not check with yourself
+            if result.events[n].kind != "BP":
+                continue
 
-    # For each of the branches, run pseudo-arclength continuation
-    for n in range(len(directions)):
-        x0 = directions[n]
-        _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], -tangents[n], M, ds_min, ds_max, ds, n_steps, sp, result)
+            comparison_point = np.append(result.events[n].u, result.events[n].p)
+            if lg.norm(x_singular - comparison_point) / M < 1.e-4:
+                print('Bifurcation point already discovered. Ending continuation along this branch.')
+                return
+        
+        # The bifurcation point is unique, do branch switching
+        x_prev = np.append(branch.u_path[-10,:], branch.p_path[-10]) # x_prev just needs to be a point on the previous path close to the bf point
+        directions, tangents = brs.branchSwitching(G, Gu_v, Gp, x_singular, x_prev, sp)
+
+        # For each of the branches, run pseudo-arclength continuation
+        for n in range(len(directions)):
+            x0 = directions[n]
+            _recursiveContinuation(G, Gu_v, Gp, x0[0:M], x0[M], tangents[n], M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
