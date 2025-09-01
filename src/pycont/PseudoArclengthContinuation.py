@@ -190,11 +190,20 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			termination_event = Event("DSFLOOR", x[0:M], x[M])
 			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
-		# Do a simple fold detection
-		if tangent[M] * prev_tangent[M] < 0.0 and n > 1: # Do not check in the first point
-			print('Fold point near', x_new)
+		# TODO check if this fold check is at the right location.
+		if tangent[M] * prev_tangent[M] < 0.0 and n > 1:
+			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, prev_tangent[M], tangent[M], tangent, ds, M, sp)
+			print('Fold point at', x_fold)
 
-			# TODO Pinpoint the location of the fold point and return
+			# Append the fold point and x_new to the current path
+			u_path[n,:] = x_fold[0:M]
+			p_path[n] = x_fold[M]
+			u_path[n+1,:] = x_new[0:M]
+			p_path[n+1] = x_new[M]
+			
+			# Stop continuation along this branch
+			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": tangent})
+			return _makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
@@ -287,7 +296,6 @@ def _computeBifurcationPointBisect(dF_w, x_start, x_end, l, r, M, a_tol, tau_vec
 	print('Warning: Bisection reached maximum steps without full convergence.')
 	return True, 0.5 * (x_start + x_end)
 
-# TODO Write this algorithm out on paper
 def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
                  			Gp : Callable[[np.ndarray, float], np.ndarray], 
@@ -299,7 +307,10 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							ds : float,
 							M : int,
 							sp : Dict,
-							max_bisect_steps=30):
+							max_bisect_steps : int=30) -> np.ndarray:
+	if value_left * value_right > 0.0:
+		print('Left and Right value have the same sign. Bisection will not work. Returning')
+		return x_left
 	
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
 		ds_alpha = alpha * ds
