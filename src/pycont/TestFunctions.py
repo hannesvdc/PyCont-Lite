@@ -3,6 +3,18 @@ import scipy.sparse.linalg as slg
 
 from typing import Callable, Tuple
 
+def make_bordered_system(F, x0, l, r, rdiff, eps_reg):
+	F0 = F(x0)
+	Mp1 = F0.size
+
+	def matvec(w):
+		w_x = w[0:Mp1] 
+		el1 = (F(x0 + rdiff * w_x) - F0) / rdiff + eps_reg * w_x + r*w[Mp1]
+		el2 = np.dot(l, w_x)
+		return np.concatenate([el1, [el2]])
+
+	return slg.LinearOperator((Mp1+1, Mp1+1), matvec)
+
 # Bifurcation Detection Test Function. We slightly regularize the system
 # for better numerical convergence behavior in L-GMRES.
 def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray], 
