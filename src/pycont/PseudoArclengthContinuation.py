@@ -177,7 +177,6 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		# Create the extended system for corrector
 		N = lambda q: np.dot(tangent, q - x) - ds
 		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
-		dF_w = lambda q, w: (F(q + r_diff * w) - F(q)) / r_diff
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
@@ -218,11 +217,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
-			tau_vector, tau_value = tf.test_fn_bifurcation(dF_w, x_new, l, r, M, prev_tau_vector)
+			tau_vector, tau_value = tf.test_fn_bifurcation(F, x_new, l, r, M, prev_tau_vector, sp)
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(dF_w, x, x_new, l, r, M, a_tol, prev_tau_vector)
+				is_bf, x_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, M, prev_tau_vector, sp)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
 					u_path[n,:] = x_singular[0:M]
@@ -246,24 +245,22 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
 	return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
-def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray], 
+def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray], 
 								   x_start : np.ndarray, 
 								   x_end : np.ndarray, 
 								   l : np.ndarray, 
 								   r : np.ndarray, 
 								   M : int, 
-								   a_tol : float, 
-								   tau_vector_prev : Optional[np.ndarray], 
+								   tau_vector_prev : Optional[np.ndarray],
+								   sp : Dict,
 								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
 	"""
 	Localizes the bifurcation point between x_start and x_end using the bisection method.
 
     Parameters
 	----------
-        dF_w: Callable
-			Function returning the Jacobian-vector product of the extended system, with signature
-			``dF_w(x, w) -> ndarray`` where `x=(u,p)` is the full state vector and `w` is the 
-			direction in which to compute the derivative
+        F: Callable
+			Extended objective function with signature ``F(x) -> ndarray`` where `x=(u,p)` is the full state vector.
         x_start : ndarray 
 			Starting point (u, p) to the 'left' of the bifurcation point.
         x_end : ndarray 
@@ -272,10 +269,10 @@ def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.
 			Random vectors used during bifurcation detection.
         M : int
 			Dimension of u.
-        a_tol : float
-			Absolute tolerance for Newton solver
         tau_vector_prev : ndarray
 			Previous tau_vector in x_start used for bifurcation detection, can be None.
+		sp : Dict
+			Solver parameters.
         max_bisect_steps : int
 			Maximum allowed number of bisection steps.
 
@@ -286,10 +283,11 @@ def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.
         x_bifurcation: ndarray (M+1,)
 			The location of the bifurcation point within the tolerance a_tol.
     """
+	a_tol = sp["tolerance"]
 
 	# Compute tau at start and end
-	_, tau_start = tf.test_fn_bifurcation(dF_w, x_start, l, r, M, tau_vector_prev)
-	_, tau_end = tf.test_fn_bifurcation(dF_w, x_end, l, r, M, tau_vector_prev)
+	_, tau_start = tf.test_fn_bifurcation(F, x_start, l, r, M, tau_vector_prev, sp)
+	_, tau_end = tf.test_fn_bifurcation(F, x_end, l, r, M, tau_vector_prev, sp)
 
 	# Check that a sign change really exists
 	if  tau_start * tau_end > 0.0:
@@ -298,7 +296,7 @@ def _computeBifurcationPointBisect(dF_w : Callable[[np.ndarray, np.ndarray], np.
 
 	for _ in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
-		_, tau_mid = tf.test_fn_bifurcation(dF_w, x_mid, l, r, M, tau_vector_prev)
+		_, tau_mid = tf.test_fn_bifurcation(F, x_mid, l, r, M, tau_vector_prev, sp)
 
 		# Narrow the interval based on sign of tau
 		if tau_start * tau_mid < 0.0:
@@ -368,6 +366,8 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
         x_fold: ndarray
 			The location of the fold point within the tolerance a_tol.
     """
+	a_tol = sp["tolerance"]
+	rdiff = sp["rdiff"]
 
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
@@ -380,8 +380,8 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 		return F
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
-		x_alpha = opt.newton_krylov(F, x_left, rdiff=sp["rdiff"])
-		tangent = computeTangent(x_alpha[0:M], x_alpha[M], Gu_v, Gp, tangent_ref, M, sp["tolerance"])
+		x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
+		tangent = computeTangent(x_alpha[0:M], x_alpha[M], Gu_v, Gp, tangent_ref, M, a_tol)
 		return tangent[M], x_alpha
 	
 	alpha_left, alpha_right = 0.0, 1.0
@@ -399,7 +399,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 			x_left = x_alpha
 
 		# Convergence check
-		if lg.norm(x_left - x_right) < sp["tolerance"]:
+		if lg.norm(x_left - x_right) < a_tol:
 			return 0.5 * (x_left + x_right)
 		
 	print('Warning: Bisection reached maximum steps without full convergence.')

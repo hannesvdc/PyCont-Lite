@@ -1,9 +1,22 @@
 import numpy as np
 import scipy.sparse.linalg as slg
 
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Dict
 
-def make_bordered_system(F, x0, l, r, rdiff, eps_reg):
+def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray], 
+						 x0 : np.ndarray, 
+						 l : np.ndarray, 
+						 r : np.ndarray, 
+						 rdiff : float, 
+						 eps_reg : float):
+	"""
+	Create the matrix-free Jacobian of F.
+
+	Returns
+	-------
+		matvec : Callable
+			A function representing the directional derivative dF/dx(x0) * w.
+	"""
 	F0 = F(x0)
 	Mp1 = F0.size
 
@@ -13,28 +26,29 @@ def make_bordered_system(F, x0, l, r, rdiff, eps_reg):
 		el2 = np.dot(l, w_x)
 		return np.concatenate([el1, [el2]])
 
-	return slg.LinearOperator((Mp1+1, Mp1+1), matvec)
+	return matvec
 
 # Bifurcation Detection Test Function. We slightly regularize the system
 # for better numerical convergence behavior in L-GMRES.
-def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray], 
+def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
 						l : np.ndarray, 
 						r : np.ndarray, 
 						M : int, 
 						y_prev : np.ndarray | None, 
+						sp : Dict,
 						eps_reg : float =1.e-5) -> Tuple[np.ndarray, float]:
 	"""
 	Main test function to detect a bifurcation point. Bifurcation points are 
 	locations x = (u, p) where Gu becomes singular and Gp lies in the column
 	space of Gu. A bifurcation point is detected when the solution y to the bordered
-	system [dF_w  r ; l^T 0] y = e_{M+2} switches sign in the last component y[M+1].
+	system [dFdx  r ; l^T 0] y = e_{M+2} switches sign in the last component y[M+1].
 
 	Parameters
 	----------
-		dF_w : Callable
-			Jacobian of the extended objective F, of signature `dF_w(x, w) -> ndarray`
-			where `x=(u,p)` is the current point and `w` is a differentiation direction.
+		F : Callable
+			Extended objective F, of signature `F(x) -> ndarray`
+			where `x=(u,p)` is the current point.
 		x : ndarray
 			Current point (u, p) on the branch.
 		l : ndarray
@@ -46,8 +60,10 @@ def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray],
 		y_prev : ndarray
 			Solution the bordered system at the previous point along the branch. Used
 			as initial guess in the L-GMRES solver. Can be None.
+		sp : Dict
+			Solver parameters.
 		eps_reg : float (default 1e-5)
-			Regularization parameter when dF_w is ill-conditioned.
+			Regularization parameter when dFdx is ill-conditioned.
 
 	Returns
 	-------
@@ -70,10 +86,7 @@ def test_fn_bifurcation(dF_w : Callable[[np.ndarray, np.ndarray], np.ndarray],
 		- e_{M+2} is the M+2 - unit vector.
 	"""
 
-	def matvec(w):
-		el_1 = dF_w(x, w[0:M+1]) + eps_reg * w[0:M+1] + r*w[M+1]
-		el_2 = np.dot(l, w[0:M+1])
-		return np.append(el_1, el_2)
+	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
 
