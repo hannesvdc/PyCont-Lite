@@ -41,40 +41,45 @@ def _Gu_v_cached(G : Callable[[np.ndarray, float], np.ndarray],
 	base_value = G(u, p)
 	return lambda v : (G(u + rdiff * v, p) - base_value) / rdiff
 
-def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
+def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
+				   u : np.ndarray, 
+				   p : float, 
+				   prev_tangent : np.ndarray, 
+				   M : int, 
+				   sp : Dict):
 	"""
 	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
 	The tangent vector then is [tau, 1] with normalization, and in the direction of prev_tangent.
 
 	Parameters:
 	----------
+	G: Callable
+		The objective function.
 	u: ndarray
 		The current state variable
 	p: float 
 		The current parameter value
-	Gu_v: Callable
-		The Matrix-free Jacobian of G(u,p) in the direction of v.
-	Gp : callable
-        Function calculating the derivative of G with respect to the parameter,
-        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
-        is the continuation parameter.
 	prev_tangent : ndarray
 		The previous tangent vector along the curve (used for initial guess)
 	M : int
 		The size of the state variable
-	a_tol: float
-		The absolute tolerance for L-GMRES
+	sp: Dict
+		Solver parameters.
 
 	Returns
 	-------
 	tangent : ndarray
 		The tangent vector at (u, p).
 	"""
+	rdiff = sp["rdiff"]
+	a_tol = sp["tolerance"]
 
-	DG = slg.LinearOperator((M, M), lambda v: Gu_v(u, p, v))
-	b = -Gp(u, p)
+	G_value = G(u, p)
+	matvec = lambda v: (G(u + rdiff * v, p) - G_value) / rdiff
+	sys = slg.LinearOperator((M, M), matvec)
+	b = -(G(u, p + rdiff) - G_value) / rdiff
 
-	tau = slg.lgmres(DG, b, x0=prev_tangent[:M], atol=a_tol)[0]
+	tau = slg.lgmres(sys, b, x0=prev_tangent[:M], atol=a_tol)[0]
 	tangent = np.append(tau, 1.0)
 	tangent = tangent / lg.norm(tangent)
 
@@ -84,8 +89,6 @@ def computeTangent(u, p, Gu_v, Gp, prev_tangent, M, a_tol):
 	return tangent
 
 def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
-                 Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
-                 Gp : Callable[[np.ndarray, float], np.ndarray], 
                  u0 : np.ndarray, 
                  p0 : float, 
                  initial_tangent : np.ndarray, 
@@ -107,14 +110,6 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
     G : callable
         Function representing the nonlinear system, with signature
         ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
-        is the continuation parameter.
-    Gu_v : callable
-        Function calculating the Jacobian of G using matrix-free directional derivatives, 
-        with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
-        is the continuation parameter, and `v` is the differentiation direction.
-    Gp : callable
-        Function calculating the derivative of G with respect to the parameter,
-        with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
         is the continuation parameter.
     u0 : ndarray
         Initial solution vector corresponding to the starting parameter `p0`.
@@ -198,11 +193,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 		
 		# Determine the tangent to the curve at current point
-		new_tangent = computeTangent(x[0:M], x[M], Gu_v, Gp, tangent, M, a_tol)
+		new_tangent = computeTangent(G, x[0:M], x[M], tangent, M, sp)
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
-			x_fold = _computeFoldPointBisect(G, Gu_v, Gp, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
+			x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
 			print('Fold point at', x_fold)
 
 			# Append the fold point and x_new to the current path
@@ -314,8 +309,6 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 	return True, 0.5 * (x_start + x_end)
 
 def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
-							Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
-                 			Gp : Callable[[np.ndarray, float], np.ndarray], 
 							x_left : np.ndarray,
 							x_right : np.ndarray,
 							value_left : float,
@@ -333,14 +326,6 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
         G : callable
 			Function representing the nonlinear system, with signature
 			``G(u, p) -> ndarray`` where `u` is the state vector and `p`
-			is the continuation parameter.
-		Gu_v : callable
-			Function calculating the Jacobian of G using matrix-free directional derivatives, 
-			with signature ``Gu_v(u, p, v) -> ndarray`` where `u` is the state vector, `p`
-			is the continuation parameter, and `v` is the differentiation direction.
-		Gp : callable
-			Function calculating the derivative of G with respect to the parameter,
-			with signature ``Gp(u, p) -> ndarray`` where `u` is the state vector and `p`
 			is the continuation parameter.
         x_left : ndarray 
 			Starting point (u, p) to the 'left' of the bifurcation point.
@@ -381,7 +366,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
 		x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(x_alpha[0:M], x_alpha[M], Gu_v, Gp, tangent_ref, M, a_tol)
+		tangent = computeTangent(G, x_alpha[0:M], x_alpha[M], tangent_ref, M, sp)
 		return tangent[M], x_alpha
 	
 	alpha_left, alpha_right = 0.0, 1.0

@@ -152,9 +152,7 @@ def _computeNullspace(Gu : Callable[[np.ndarray], np.ndarray],
 
     return phi, w, w_1
 
-def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray], 
-                    Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray], 
-                    Gp : Callable[[np.ndarray, float], np.ndarray], 
+def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],  
                     x_singular : np.ndarray, 
                     x_prev : np.ndarray, 
                     sp : Dict) -> Tuple[List[np.ndarray], List[np.ndarray]]:
@@ -165,10 +163,6 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
     ----------
     G : callable
         The objective function.
-    Gu_v : callable
-        Matrix-free Jacobian of G.
-    Gp : callable
-        Derivative of G with respect the parameter `p`.
     x_singular : ndarray
         The bifurcation point (sometimes called a `singular point').
     x_prev : ndarray
@@ -190,6 +184,11 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
     M = x_singular.size - 1
     u = x_singular[0:M]
     p = x_singular[M]
+
+    # Create gradient functions
+    rdiff = sp["rdiff"]
+    Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff
+    Gp = lambda u, p: (G(u, p + rdiff) - G(u, p)) / rdiff
 
     # Computing necessary coefficients and vectors
     phi, w, w_1 =_computeNullspace(lambda v: Gu_v(u, p, v), Gp(u,p), M, sp["rdiff"])
