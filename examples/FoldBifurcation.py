@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pycont
 
 def FoldTest():
-	f = lambda x, r: np.array([r + x[0]**2])
+	G = lambda x, r: np.array([r + x[0]**2])
 
 	u0 = np.array([-5.0])
 	p0 = -u0[0]**2
@@ -14,7 +14,7 @@ def FoldTest():
 	ds = 0.1
 	n_steps = 5000
 	solver_parameters = {"tolerance": 1e-10}
-	continuation_result = pycont.pseudoArclengthContinuation(f, u0, p0, ds_min, ds_max, ds, n_steps, solver_parameters=solver_parameters)
+	continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min, ds_max, ds, n_steps, solver_parameters=solver_parameters)
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))

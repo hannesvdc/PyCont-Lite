@@ -52,7 +52,7 @@ def computeTangent(G : Callable[[np.ndarray, float], np.ndarray],
 	p: float 
 		The current parameter value
 	prev_tangent : ndarray
-		The previous tangent vector along the curve (used for initial guess)
+		The previous tangent vector along the curve (used for initial guess), can be None.
 	sp: Dict
 		Solver parameters.
 
@@ -132,7 +132,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
     """    
 	
 	# Infer parameters from inputs
-	M = u0.size
+	M = len(u0)
 	a_tol = sp["tolerance"]
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]

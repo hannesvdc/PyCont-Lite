@@ -159,6 +159,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     result.events.append(termination_event)
     termination_event_index = len(result.events)-1
 
+    # If there are no bifurcation or fold points on this path, return
     if termination_event.kind != "LP" and termination_event.kind != "BP":
         return
 
@@ -169,7 +170,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         final_tangent = termination_event.info["tangent"]
         _recursiveContinuation(G, u_final, p_final, final_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
 
-    # If there are no bifurcation points on this path, return
+    # If there is a bifurcation point on this path, do branch switching
     elif termination_event.kind == "BP":
         x_singular = np.append(termination_event.u, termination_event.p)
     
