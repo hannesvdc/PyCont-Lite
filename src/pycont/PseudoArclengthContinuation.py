@@ -34,18 +34,10 @@ def _makeBranch(id, termination_event, u_path, p_path):
 	"""
 	return Branch(id, None, termination_event, u_path, p_path)
 
-def _Gu_v_cached(G : Callable[[np.ndarray, float], np.ndarray], 
-				 u : np.ndarray, 
-				 p : float,
-				 rdiff : float) : 
-	base_value = G(u, p)
-	return lambda v : (G(u + rdiff * v, p) - base_value) / rdiff
-
 def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
 				   u : np.ndarray, 
 				   p : float, 
 				   prev_tangent : np.ndarray, 
-				   M : int, 
 				   sp : Dict):
 	"""
 	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
@@ -61,8 +53,6 @@ def computeTangent(G : Callable[[np.ndarray, float], np.ndarray],
 		The current parameter value
 	prev_tangent : ndarray
 		The previous tangent vector along the curve (used for initial guess)
-	M : int
-		The size of the state variable
 	sp: Dict
 		Solver parameters.
 
@@ -73,6 +63,7 @@ def computeTangent(G : Callable[[np.ndarray, float], np.ndarray],
 	"""
 	rdiff = sp["rdiff"]
 	a_tol = sp["tolerance"]
+	M = len(u)
 
 	G_value = G(u, p)
 	matvec = lambda v: (G(u + rdiff * v, p) - G_value) / rdiff
@@ -193,11 +184,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 		
 		# Determine the tangent to the curve at current point
-		new_tangent = computeTangent(G, x[0:M], x[M], tangent, M, sp)
+		new_tangent = computeTangent(G, x[0:M], x[M], tangent, sp)
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
-			x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, M, sp)
+			x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
 			print('Fold point at', x_fold)
 
 			# Append the fold point and x_new to the current path
@@ -216,7 +207,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, M, prev_tau_vector, sp)
+				is_bf, x_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, prev_tau_vector, sp)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
 					u_path[n,:] = x_singular[0:M]
@@ -245,7 +236,6 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 								   x_end : np.ndarray, 
 								   l : np.ndarray, 
 								   r : np.ndarray, 
-								   M : int, 
 								   tau_vector_prev : Optional[np.ndarray],
 								   sp : Dict,
 								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
@@ -262,8 +252,6 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 			End point (u, p) to the 'right' of the bifurcation point.
         l, r : ndarray
 			Random vectors used during bifurcation detection.
-        M : int
-			Dimension of u.
         tau_vector_prev : ndarray
 			Previous tau_vector in x_start used for bifurcation detection, can be None.
 		sp : Dict
@@ -279,6 +267,7 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 			The location of the bifurcation point within the tolerance a_tol.
     """
 	a_tol = sp["tolerance"]
+	M = len(x_start) - 1
 
 	# Compute tau at start and end
 	_, tau_start = tf.test_fn_bifurcation(F, x_start, l, r, M, tau_vector_prev, sp)
@@ -315,7 +304,6 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							value_right : float,
 							tangent_ref : np.ndarray,
 							ds : float,
-							M : int,
 							sp : Dict,
 							max_bisect_steps : int=30) -> np.ndarray:
 	"""
@@ -339,8 +327,6 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 			Reference tangent (typically at x_left) to speed up tangent computations.
 		ds : float
 			Total arclength between x_left and x_right.
-        M : int
-			Dimension of u.
         sp : Dict
 			Solver parameters.
         max_bisect_steps : int
@@ -353,6 +339,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
     """
 	a_tol = sp["tolerance"]
 	rdiff = sp["rdiff"]
+	M = len(x_left)-1
 
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
@@ -366,7 +353,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
 		x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(G, x_alpha[0:M], x_alpha[M], tangent_ref, M, sp)
+		tangent = computeTangent(G, x_alpha[0:M], x_alpha[M], tangent_ref, sp)
 		return tangent[M], x_alpha
 	
 	alpha_left, alpha_right = 0.0, 1.0

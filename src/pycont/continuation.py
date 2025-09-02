@@ -90,14 +90,14 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
     initial_tangent = (u1 - u0) / rdiff
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
-    tangent = pac.computeTangent(G, u0, p0, initial_tangent, M, sp)
+    tangent = pac.computeTangent(G, u0, p0, initial_tangent, sp)
 
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
     starting_event = pac.Event("SP", u0, p0)
     result.events.append(starting_event)
-    _recursiveContinuation(G, u0, p0,  tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
-    _recursiveContinuation(G, u0, p0, -tangent, M, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+    _recursiveContinuation(G, u0, p0,  tangent, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+    _recursiveContinuation(G, u0, p0, -tangent, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
 
     # Return all found branches and bifurcation points
     return result
@@ -106,7 +106,6 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                            u0 : np.ndarray, 
                            p0 : float, 
                            tangent : np.ndarray, 
-                           M : int, 
                            ds_min : float, 
                            ds_max : float, 
                            ds : float, 
@@ -131,8 +130,6 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         Initial value of the continuation parameter.
     tangent : ndarray
         Tangent to the current branch in (u0, p0)
-    M : int
-        Size of the state variable u
     ds_min : float
         Minimum allowable continuation step size.
     ds_max : float
@@ -170,7 +167,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         u_final = termination_event.u
         p_final = termination_event.p
         final_tangent = termination_event.info["tangent"]
-        _recursiveContinuation(G, u_final, p_final, final_tangent, M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+        _recursiveContinuation(G, u_final, p_final, final_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
 
     # If there are no bifurcation points on this path, return
     elif termination_event.kind == "BP":
@@ -182,7 +179,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                 continue
 
             comparison_point = np.append(result.events[n].u, result.events[n].p)
-            if lg.norm(x_singular - comparison_point) / M < 1.e-4:
+            if lg.norm(x_singular - comparison_point) / len(x_singular) < 1.e-4:
                 print('Bifurcation point already discovered. Ending continuation along this branch.')
                 return
         
@@ -191,6 +188,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
+        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, x0[0:M], x0[M], tangents[n], M, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            _recursiveContinuation(G, x0[0:M], x0[M], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
