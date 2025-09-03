@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pycont
 
 def FoldTest():
-	G = lambda x, r: np.array([r + x[0]**2])
+	G = lambda x, r: r + x**2
 
 	u0 = np.array([-5.0])
 	p0 = -u0[0]**2

@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import pycont
 
 def TransCriticalTest():
-	G = lambda x, r: np.array([r*x[0] - x[0]**2])
-
+	G = lambda x, r: r*x - x**2
+	
 	ds_max = 0.001
 	ds_min = 1.e-6
 	ds0 = 0.1
