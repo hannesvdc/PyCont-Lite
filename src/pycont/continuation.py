@@ -162,6 +162,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Calculate the eigenvalues with largest real part to analyze stability of the branch
     if sp["analyze_stability"]:
+        print("Analyzing stability by computing the right-most eigenvalue.")
         index = len(branch.p_path) // 2
         rightmost_eigenvalue = stability.rightmost_eig(G, branch.u_path[index,:], branch.p_path[index], sp)
         branch.stable = (rightmost_eigenvalue < 0.0)
