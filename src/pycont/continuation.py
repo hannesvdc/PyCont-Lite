@@ -5,14 +5,9 @@ import scipy.optimize as opt
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
+from .Types import ContinuationResult
 
-from dataclasses import dataclass, field
-from typing import Callable, Optional, Dict, List, Any
-
-@dataclass
-class ContinuationResult:
-    branches: List[pac.Branch] = field(default_factory=list)
-    events: List[pac.Event] = field(default_factory=list)
+from typing import Callable, Optional, Dict, Any
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,

@@ -5,35 +5,10 @@ import scipy.sparse.linalg as slg
 import scipy.optimize as opt
 
 from . import TestFunctions as tf
+from .Types import Branch, Event, makeBranch
 
-from dataclasses import dataclass, field
-from typing import Callable, Tuple, Dict, Literal, Any, Optional
+from typing import Callable, Tuple, Dict, Any, Optional
 
-EventKind = Literal["SP", "LP", "BP", "DSFLOOR", "MAXSTEPS"]
-
-@dataclass
-class Event:
-	kind: EventKind
-	u: np.ndarray
-	p: float
-	info: Dict = field(default_factory=dict)
-
-@dataclass
-class Branch:
-	id: int
-	from_event: Optional[int]
-	termination_event: Event
-	u_path: np.ndarray
-	p_path: np.ndarray
-	stable: Optional[bool]
-	info: Dict = field(default_factory=dict)
-
-def _makeBranch(id, termination_event, u_path, p_path):
-	"""
-	Internal function to create a Branch dataclass instance from the
-	current continuation data.
-	"""
-	return Branch(id, None, termination_event, u_path, p_path, None)
 
 def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
 				   u : np.ndarray, 
@@ -182,7 +157,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M])
-			return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+			return makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 		
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x[0:M], x[M], tangent, sp)
@@ -200,7 +175,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			
 			# Stop continuation along this branch
 			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
-			return _makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
+			return makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
@@ -214,7 +189,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					u_path[n,:] = x_singular[0:M]
 					p_path[n] = x_singular[M]
 					termination_event = Event("BP", x_singular[0:M], x_singular[M])
-					return _makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
+					return makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
 				
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
@@ -230,7 +205,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		print(print_str)
 
 	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
-	return _makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+	return makeBranch(branch_id, termination_event, u_path, p_path), termination_event
 
 def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray], 
 								   x_start : np.ndarray, 
