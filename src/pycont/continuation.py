@@ -58,8 +58,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     -------
     ContinuationResult
         With fields:
-        - branches : list of dicts with keys {"u", "p"} holding arrays along each branch
-        - bifurcation_points : list of singular points in R^{M+1}
+        - branches
+        - events
 
     Notes
     -----
@@ -157,10 +157,11 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Calculate the eigenvalues with largest real part to analyze stability of the branch
     if sp["analyze_stability"]:
-        print("Analyzing stability by computing the right-most eigenvalue.")
+        print("Analyzing stability by computing the right-most eigenvalue...", end='\t')
         index = len(branch.p_path) // 2
         rightmost_eigenvalue = stability.rightmost_eig(G, branch.u_path[index,:], branch.p_path[index], sp)
         branch.stable = (rightmost_eigenvalue < 0.0)
+        print('Stable' if branch.stable else 'Unstable', end='.\n')
 
     # If there are no bifurcation or fold points on this path, return
     if termination_event.kind != "LP" and termination_event.kind != "BP":
