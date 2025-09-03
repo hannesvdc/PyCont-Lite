@@ -24,7 +24,8 @@ def TransCriticalTest():
 	plt.plot(x_grid, 0.0*x_grid, 'lightgray')
 	plt.plot(0.0*y_grid, y_grid, 'lightgray')
 	for branch in continuation_result.branches:
-		plt.plot(branch.p_path, branch.u_path[:,0], 'blue')
+		linestyle = '-' if branch.stable else '--'
+		plt.plot(branch.p_path, branch.u_path[:,0], color='blue', linestyle=linestyle)
 	for event in continuation_result.events:
 		if event.kind == "SP":
 			plt.plot(event.p, event.u, 'go', label=event.kind)

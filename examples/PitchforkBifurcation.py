@@ -25,7 +25,8 @@ def PitchforkTest():
 	plt.plot(x_grid, 0.0*x_grid, color='lightgray')
 	plt.plot(0.0*y_grid, y_grid, color='lightgray')
 	for branch in continuation_result.branches:
-		plt.plot(branch.p_path, branch.u_path[:,0], color='blue')
+		linestyle = '-' if branch.stable else '--'
+		plt.plot(branch.p_path, branch.u_path[:,0], color='blue', linestyle=linestyle)
 	for event in continuation_result.events:
 		if event.kind == "SP":
 			plt.plot(event.p, event.u, 'go', label=event.kind)

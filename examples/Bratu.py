@@ -39,8 +39,9 @@ def BratuTest():
 
     # Plot the bifurcation diagram (lambda, max(u))
     for branch in continuation_result.branches:
+        linestyle = '-' if branch.stable else '--'
         max_u = np.sign(branch.u_path[:, 50]) * np.max(np.abs(branch.u_path), axis=1)
-        plt.plot(branch.p_path, max_u, color="tab:blue")
+        plt.plot(branch.p_path, max_u, color="tab:blue", linestyle=linestyle)
     for event in continuation_result.events:
         u_value = np.max(np.abs(event.u)) * np.sign(event.u[50])
         if event.kind == "SP":
