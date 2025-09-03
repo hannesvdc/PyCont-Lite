@@ -2,7 +2,7 @@
 
 [![PyPI version](https://badge.fury.io/py/pycont-lite.svg)](https://badge.fury.io/py/pycont-lite)
 
-**PyCont-Lite** is a simple, matrix-free pseudo-arclength continuation library for solving parametric nonlinear systems of the form
+**PyCont-Lite** is a simple, matrix-free arclength continuation library for solving parametric nonlinear systems of the form
 
 $$
 G(u, p) = 0
@@ -27,7 +27,6 @@ Minimal Working Example (Pitchfork Bifurcation)
 <pre>
 import numpy as np
 import pycont
-import matplotlib.pyplot as plt
 
 # Define the pitchfork function
 def G(u, p):
@@ -41,13 +40,7 @@ p0 = 0.0
 continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min=0.001, ds_max=0.05, ds=0.01, n_steps=200)
 
 # Plot the solution curve
-for branch in continuation_result.branches:
-	plt.plot(branch['p'], branch['u'][:,0], 'blue')
-plt.xlabel('p')
-plt.ylabel('u')
-plt.title('Bifurcation diagram')
-plt.grid()
-plt.show()  
+pycont.plotBifurcationDiagram(continuation_result)
 </pre>
 
 
@@ -57,9 +50,9 @@ This project is licensed under the MIT License — see the LICENSE file for deta
 
 Acknowledgement
 --- 
-I started this project because there are (in my opinion) no good, lightweight, and easy to use numerical continuation packages 
+I started this project because there are (in my opinion) no good, lightweight, and easy to use arclength continuation packages 
 in the python ecosystem. These days, researchers are too often forced to use ancient Fortran packages like AUTO, or language-specific 
-tools like MATCONT in Matlab. PyCont-Lite seeks to create an elegent package with all features for Python - the default language for
+tools like MATCONT or COCO. PyCont-Lite seeks to create an elegent package with all features for Python - the default language for
 scientific computing and machine learning. 
 
 If you want to see new features, either contact me or write a pull request. I will continue updating PyCont-Lite based on my own needs, and soon
