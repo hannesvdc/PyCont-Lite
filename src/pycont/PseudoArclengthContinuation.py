@@ -25,6 +25,7 @@ class Branch:
 	termination_event: Event
 	u_path: np.ndarray
 	p_path: np.ndarray
+	stable: Optional[bool]
 	info: Dict = field(default_factory=dict)
 
 def _makeBranch(id, termination_event, u_path, p_path):
@@ -32,7 +33,7 @@ def _makeBranch(id, termination_event, u_path, p_path):
 	Internal function to create a Branch dataclass instance from the
 	current continuation data.
 	"""
-	return Branch(id, None, termination_event, u_path, p_path)
+	return Branch(id, None, termination_event, u_path, p_path, None)
 
 def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
 				   u : np.ndarray, 
@@ -70,7 +71,7 @@ def computeTangent(G : Callable[[np.ndarray, float], np.ndarray],
 	sys = slg.LinearOperator((M, M), matvec)
 	b = -(G(u, p + rdiff) - G_value) / rdiff
 
-	tau = slg.lgmres(sys, b, x0=prev_tangent[:M], atol=a_tol)[0]
+	tau = slg.lgmres(sys, b, x0=prev_tangent[:-1], atol=a_tol)[0]
 	tangent = np.append(tau, 1.0)
 	tangent = tangent / lg.norm(tangent)
 
@@ -339,7 +340,6 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
     """
 	a_tol = sp["tolerance"]
 	rdiff = sp["rdiff"]
-	M = len(x_left)-1
 
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
@@ -348,13 +348,13 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
 		ds_alpha = alpha * ds
 		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
-		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		F = lambda q: np.append(G(q[0:-1], q[-1]), N(q))
 		return F
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
 		x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(G, x_alpha[0:M], x_alpha[M], tangent_ref, sp)
-		return tangent[M], x_alpha
+		tangent = computeTangent(G, x_alpha[0:-1], x_alpha[-1], tangent_ref, sp)
+		return tangent[-1], x_alpha
 	
 	alpha_left, alpha_right = 0.0, 1.0
 	for _ in range(max_bisect_steps):

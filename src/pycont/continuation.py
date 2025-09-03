@@ -4,6 +4,7 @@ import scipy.optimize as opt
 
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
+from . import Stability as stability
 
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Dict, List, Any
@@ -83,10 +84,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)
+    sp.setdefault("analyze_stability", True)
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
-    M = u0.size
     u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
     initial_tangent = (u1 - u0) / rdiff
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
@@ -159,6 +160,12 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     result.events.append(termination_event)
     termination_event_index = len(result.events)-1
 
+    # Calculate the eigenvalues with largest real part to analyze stability of the branch
+    if sp["analyze_stability"]:
+        index = len(branch.p_path) // 2
+        rightmost_eigenvalue = stability.rightmost_eig(G, branch.u_path[index,:], branch.p_path[index], sp)
+        branch.stable = (rightmost_eigenvalue < 0.0)
+
     # If there are no bifurcation or fold points on this path, return
     if termination_event.kind != "LP" and termination_event.kind != "BP":
         return
@@ -189,7 +196,6 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
-        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, x0[0:M], x0[M], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            _recursiveContinuation(G, x0[0:-1], x0[-1], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
