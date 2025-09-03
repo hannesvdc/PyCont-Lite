@@ -38,11 +38,11 @@ u0 = np.array([2.0])
 p0 = 0.0
 
 # Run continuation
-continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min=0.001, ds_max=0.05, ds=0.01, N=200)
+continuation_result = pycont.pseudoArclengthContinuation(G, u0, p0, ds_min=0.001, ds_max=0.05, ds=0.01, n_steps=200)
 
 # Plot the solution curve
 for branch in continuation_result.branches:
-		ax.plot(branch['p'], branch['u'][:,0], 'blue')
+	plt.plot(branch['p'], branch['u'][:,0], 'blue')
 plt.xlabel('p')
 plt.ylabel('u')
 plt.title('Bifurcation diagram')
