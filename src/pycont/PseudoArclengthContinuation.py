@@ -147,7 +147,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 			# Corrector: Newton-Krylov
 			try:
-				x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
+				with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+					x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				ds = min(1.2*ds, ds_max)
 				break
 			except:
@@ -327,7 +328,8 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 		return F
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
-		x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
+		with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+			x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
 		tangent = computeTangent(G, x_alpha[0:-1], x_alpha[-1], tangent_ref, sp)
 		return tangent[-1], x_alpha
 	

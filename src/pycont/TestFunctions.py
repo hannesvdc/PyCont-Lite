@@ -21,7 +21,7 @@ def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray],
 	Mp1 = F0.size
 
 	def matvec(w):
-		w_x = w[0:Mp1] 
+		w_x = w[0:Mp1]
 		el1 = (F(x0 + rdiff * w_x) - F0) / rdiff + eps_reg * w_x + r*w[Mp1]
 		el2 = np.dot(l, w_x)
 		return np.concatenate([el1, [el2]])
@@ -101,6 +101,8 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 			return vec
 		return slg.LinearOperator((M+2,M+2), apply)
 	B_inv = poly_inv(matvec, 1.0, min(M,10))
-	y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
+
+	with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+		y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
 
 	return y, y[M+1]

@@ -22,7 +22,7 @@ def BratuTest():
         r = u_xx + lam * np.exp(u_full[1:-1])
         return r
     
-    # We know that u = 0 for lambda = 0 - otherwise we must solve G(u, r0) = 0.
+    # We know that u = 0 for lambda = 0 - otherwise we must solve G(u, lambda0) = 0.
     lam0 = 0.0
     u0 = np.zeros(M)
 
@@ -39,7 +39,7 @@ def BratuTest():
 
     # Plot the bifurcation diagram (lambda, max(u))
     u_transform = lambda u : np.sign(u[50]) * np.max(np.abs(u))
-    pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform)
+    pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform, p_label=r'$\lambda$', u_label=r'$\text{sign}(u) ||u||_{\infty}$')
 
 if __name__ == '__main__':
     BratuTest()

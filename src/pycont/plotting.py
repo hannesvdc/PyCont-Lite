@@ -4,13 +4,28 @@ import matplotlib.pyplot as plt
 
 from .Types import ContinuationResult
 
-def plotBifurcationDiagram(cr : ContinuationResult, u_transform=None) -> None:
-    if u_transform is None:
+def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
+    
+    if "p_label" in kwargs:
+        xlabel = kwargs["p_label"]
+    else:
+        xlabel = r'$p$'
+
+    if "u_label" in kwargs:
+        ylabel = kwargs["u_label"]
+    else:
+        ylabel = r'$u$'
+
+    if "u_transform" in kwargs:
+        u_transform = kwargs["u_transform"]
+    else:
         M = cr.branches[0].u_path.shape[1]
         if M == 1:
             u_transform = lambda u : u[0]
+            ylabel = r'$u$'
         else:
             u_transform = lambda u : lg.norm(u)
+            ylabel = r'$||u||$'
 
     # Plot the branches
     for branch in cr.branches:
@@ -25,7 +40,7 @@ def plotBifurcationDiagram(cr : ContinuationResult, u_transform=None) -> None:
             plt.plot(event.p, u_transform(event.u), style[event.kind], label=event.kind)
 
     plt.grid(visible=True)
-    plt.xlabel(r'$r$')
-    plt.ylabel(r'$u$', rotation=0)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel, rotation=0)
     plt.legend()
     plt.show()	
