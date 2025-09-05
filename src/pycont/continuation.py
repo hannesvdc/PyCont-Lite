@@ -53,6 +53,13 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             Nonlinear residual tolerance for convergence.
         - "bifurcation_detection" : bool (default True)
             Disabling bifurcation detection can significantly speed up continuation when there are no bifurcation points.
+        - "analyze_stability" : bool (default True)
+            By default, the real part of the leading eigenvalue of Gu is computed. Negative eigenvalue indicates a 
+            stable branch, and a positive eigenvalue means the branch is unstable. Stability analysis can be disabled
+            to speep up computations.
+        - "initial_directions" : str (default 'both')
+            Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
+            'decrease_p' respectively. Default is 'both'.
 
     Returns
     -------
