@@ -14,7 +14,7 @@ def computeTangent(G : Callable[[np.ndarray, float], np.ndarray],
 				   u : np.ndarray, 
 				   p : float, 
 				   prev_tangent : np.ndarray, 
-				   sp : Dict):
+				   sp : Dict) -> np.ndarray:
 	"""
 	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
 	The tangent vector then is [tau, 1] with normalization, and in the direction of prev_tangent.
@@ -165,18 +165,21 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
-			x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
-			print('Fold point at', x_fold)
+			is_fold, x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
+			if not is_fold:
+				print('Erroneous Fold Point detection due to blow-up in tangent vector.')
+			else:
+				print('Fold point at', x_fold)
 
-			# Append the fold point and x_new to the current path
-			u_path[n,:] = x_fold[0:M]
-			p_path[n] = x_fold[M]
-			u_path[n+1,:] = x_new[0:M]
-			p_path[n+1] = x_new[M]
-			
-			# Stop continuation along this branch
-			termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
-			return makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
+				# Append the fold point and x_new to the current path
+				u_path[n,:] = x_fold[0:M]
+				p_path[n] = x_fold[M]
+				u_path[n+1,:] = x_new[0:M]
+				p_path[n+1] = x_new[M]
+				
+				# Stop continuation along this branch
+				termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
+				return makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
@@ -286,7 +289,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							tangent_ref : np.ndarray,
 							ds : float,
 							sp : Dict,
-							max_bisect_steps : int=30) -> np.ndarray:
+							max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
 	"""
 	Localizes the fold point between x_left and x_right using the bisection method.
 
@@ -315,6 +318,8 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 
     Returns
 	-------
+		is_fold : bool
+			True if the bisection algorithm found a fold point, False otherwise.
         x_fold: ndarray
 			The location of the fold point within the tolerance a_tol.
     """
@@ -323,7 +328,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
-		return x_left
+		return False, x_left
 	
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
 		ds_alpha = alpha * ds
@@ -352,8 +357,8 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 			x_left = x_alpha
 
 		# Convergence check
-		if lg.norm(x_left - x_right) < a_tol:
-			return 0.5 * (x_left + x_right)
+		if np.abs(value) < a_tol:
+			return True, 0.5 * (x_left + x_right)
 		
 	print('Warning: Bisection reached maximum steps without full convergence.')
-	return 0.5 * (x_left + x_right)
+	return np.abs(value) < 0.1, 0.5 * (x_left + x_right)
