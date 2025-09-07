@@ -191,6 +191,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					p_path[n] = x_singular[M]
 					termination_event = Event("BP", x_singular[0:M], x_singular[M])
 					return makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
+				else:
+					print('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
 				
 			prev_tau_value = tau_value
 			prev_tau_vector = tau_vector
@@ -268,11 +270,13 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 			tau_start = tau_mid
 
 		# Convergence check
-		if np.linalg.norm(x_end - x_start) < a_tol:
+		if np.abs(tau_mid) < a_tol:
+			print('Bisection converged', tau_mid)
 			return True, 0.5 * (x_start + x_end)
 
 	print('Warning: Bisection reached maximum steps without full convergence.')
-	return True, 0.5 * (x_start + x_end)
+	x_mid = 0.5 * (x_start + x_end)
+	return np.abs(tau_mid) < 1.0, x_mid
 
 def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							x_left : np.ndarray,

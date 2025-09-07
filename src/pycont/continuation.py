@@ -56,7 +56,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         - "analyze_stability" : bool (default True)
             By default, the real part of the leading eigenvalue of Gu is computed. Negative eigenvalue indicates a 
             stable branch, and a positive eigenvalue means the branch is unstable. Stability analysis can be disabled
-            to speep up computations.
+            to speed up computations.
         - "initial_directions" : str (default 'both')
             Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
             'decrease_p' respectively. Default is 'both'.
@@ -97,7 +97,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     tangent = pac.computeTangent(G, u0, p0, initial_tangent, sp)
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
-    if mode == "both":
+    if mode == "both" or tangent[-1] == 0.0: # Edge case if we start on a fold point
         dirs = [tangent, -tangent]
     elif mode == "increase_p":
         dirs = [tangent if tangent[-1] > 0 else -tangent]

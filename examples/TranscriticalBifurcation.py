@@ -5,11 +5,11 @@ import pycont
 def TransCriticalTest():
 	G = lambda x, r: r*x - x**2
 	
-	ds_max = 0.001
+	ds_max = 0.01
 	ds_min = 1.e-6
-	ds0 = 0.1
+	ds0 = 0.001
 
-	n_steps = 10000
+	n_steps = 2000
 	u0 = np.array([-5.0])
 	p0 = -5.0
 	solver_parameters = {"tolerance": 1e-10}
