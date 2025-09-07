@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pycont
 
@@ -32,7 +31,7 @@ def BratuTest():
     ds0 = 1e-4
     n_steps = 2000
     solver_parameters = {"tolerance": 1e-10, "bifurcation_detection": True}
-    continuation_result = pycont.pseudoArclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+    continuation_result = pycont.arclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
     # Print some Internal info
     print('\nNumber of Branches:', len(continuation_result.branches))

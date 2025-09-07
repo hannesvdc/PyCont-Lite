@@ -1,7 +1,7 @@
-from .continuation import pseudoArclengthContinuation
+from .continuation import pseudoArclengthContinuation as arclengthContinuation
 from .plotting import plotBifurcationDiagram
 
 __all__ = [
-    "pseudoArclengthContinuation", 
+    "arclengthContinuation", 
     "plotBifurcationDiagram",
 ]
