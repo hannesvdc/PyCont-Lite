@@ -53,6 +53,13 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             Nonlinear residual tolerance for convergence.
         - "bifurcation_detection" : bool (default True)
             Disabling bifurcation detection can significantly speed up continuation when there are no bifurcation points.
+        - "analyze_stability" : bool (default True)
+            By default, the real part of the leading eigenvalue of Gu is computed. Negative eigenvalue indicates a 
+            stable branch, and a positive eigenvalue means the branch is unstable. Stability analysis can be disabled
+            to speed up computations.
+        - "initial_directions" : str (default 'both')
+            Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
+            'decrease_p' respectively. Default is 'both'.
 
     Returns
     -------
@@ -80,6 +87,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)
     sp.setdefault("analyze_stability", True)
+    mode = sp.setdefault("initial_directions", "both").lower()
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
@@ -88,12 +96,23 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
     tangent = pac.computeTangent(G, u0, p0, initial_tangent, sp)
 
+    # Make a list of which directions to explore (increase_p, decrease_p or both)
+    if mode == "both" or tangent[-1] == 0.0: # Edge case if we start on a fold point
+        dirs = [tangent, -tangent]
+    elif mode == "increase_p":
+        dirs = [tangent if tangent[-1] > 0 else -tangent]
+    elif mode == "decrease_p":
+        dirs = [tangent if tangent[-1] < 0 else -tangent]
+    else:
+        print(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
+        dirs = []
+
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
     starting_event = pac.Event("SP", u0, p0)
     result.events.append(starting_event)
-    _recursiveContinuation(G, u0, p0,  tangent, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
-    _recursiveContinuation(G, u0, p0, -tangent, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+    for t0 in dirs:
+        _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
 
     # Return all found branches and bifurcation points
     return result
