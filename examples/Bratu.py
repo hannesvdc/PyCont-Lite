@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 import pycont
 
@@ -12,7 +11,6 @@ def BratuTest():
     N = 101 # total number of points
     x = np.linspace(0.0, 1.0, N)
     dx = x[1] - x[0]
-    M = N - 2
 
     def G(u: np.ndarray, lam: float) -> np.ndarray:
         u_full = np.zeros(N, dtype=float)
@@ -24,15 +22,15 @@ def BratuTest():
     
     # We know that u = 0 for lambda = 0 - otherwise we must solve G(u, lambda0) = 0.
     lam0 = 0.0
-    u0 = np.zeros(M)
+    u0 = np.zeros(N-2)
 
     # Do continuation
     ds_max = 0.01
     ds_min = 1e-6
     ds0 = 1e-4
     n_steps = 2000
-    solver_parameters = {"tolerance": 1e-10, "bifurcation_detection": True}
-    continuation_result = pycont.pseudoArclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+    solver_parameters = {"tolerance": 1e-10}
+    continuation_result = pycont.arclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
     # Print some Internal info
     print('\nNumber of Branches:', len(continuation_result.branches))
