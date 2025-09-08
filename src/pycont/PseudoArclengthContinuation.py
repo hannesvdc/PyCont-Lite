@@ -9,6 +9,24 @@ from .Types import Branch, Event, makeBranch
 
 from typing import Callable, Tuple, Dict, Any, Optional
 
+def computeTangentBordered(G, u, p, prev_tangent, sp, eps_reg=1e-5):
+	rdiff = sp["rdiff"]
+	M = len(u)
+
+	G_value = G(u, p)
+	Gp = (G(u, p + rdiff) - G_value) / rdiff
+	c = prev_tangent[0:M]
+	def matvec(v):
+		J = (G(u + rdiff * v[0:M], p) - G_value) / rdiff + eps_reg * v[0:M] + Gp * v[M]
+		eq_2 = np.dot(c, v[0:M])
+		return np.append(J, eq_2)
+
+	sys = slg.LinearOperator((M+1, M+1), matvec)
+	rhs = np.zeros(M+1); rhs[M] = 1.0
+	tau, _ = slg.lgmres(sys, rhs, x0=prev_tangent)
+	tau = tau / lg.norm(tau)
+
+	return tau
 
 def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
 				   u : np.ndarray, 
