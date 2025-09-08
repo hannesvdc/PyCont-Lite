@@ -23,7 +23,7 @@ with **automatic bifurcation detection, branch switching, and stability analysis
 PyCont-Lite requires only:
 - `numpy`
 - `scipy`
-- `matplotlib` (optional, for plotting)
+- `matplotlib`
 
 Install via PyPI (pip):
 ```
