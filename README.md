@@ -58,7 +58,7 @@ continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds
 pycont.plotBifurcationDiagram(continuation_result)
 ```
 
-![Pitchfork bifurcation](https://raw.githubusercontent.com/yourname/pycont-lite/main/docs/images/Pitchfork.png)
+<img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/Pitchfork.png" width="400">
 
 ### Fold Bifurcation
 
@@ -85,7 +85,7 @@ continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds
 pycont.plotBifurcationDiagram(continuation_result)
 ```
 
-![Fold bifurcation](https://raw.githubusercontent.com/yourname/pycont-lite/main/docs/images/Fold.png)
+<img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/Fold.png" width="400">
 
 ### Bratu: PDE Example
 
@@ -132,7 +132,7 @@ pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform, p_la
 
 This produces the classical S-shaped bifurcation curve with a fold near $\lambda \approx 3.51$.
 
-![Bratu diagram](https://raw.githubusercontent.com/yourname/pycont-lite/main/docs/images/Bratu.png)
+<img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/Bratu.png" width="400">
 
 ## Plotting Bifurcation Diagrams
 
