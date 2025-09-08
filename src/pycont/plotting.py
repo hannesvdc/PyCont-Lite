@@ -41,6 +41,6 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
 
     plt.grid(visible=True)
     plt.xlabel(xlabel)
-    plt.ylabel(ylabel, rotation=0)
+    plt.ylabel(ylabel)
     plt.legend()
     plt.show()	
