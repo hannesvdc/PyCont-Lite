@@ -307,7 +307,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							tangent_ref : np.ndarray,
 							ds : float,
 							sp : Dict,
-							max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
+							max_bisect_steps : int=20) -> Tuple[bool, np.ndarray]:
 	"""
 	Localizes the fold point between x_left and x_right using the bisection method.
 

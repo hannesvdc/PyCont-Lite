@@ -30,7 +30,7 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
     # Plot the branches
     for branch in cr.branches:
         u_vals = np.apply_along_axis(u_transform, 1, branch.u_path)
-        linestyle = '-' if branch.stable else '--'
+        linestyle = '--' if not branch.stable else '-'
         plt.plot(branch.p_path, u_vals, color='tab:blue', linestyle=linestyle)
 		
     # Plot all interesting points
