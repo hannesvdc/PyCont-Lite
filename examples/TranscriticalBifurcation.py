@@ -7,7 +7,7 @@ def TransCriticalTest():
 	
 	ds_max = 0.01
 	ds_min = 1.e-6
-	ds0 = 0.001
+	ds0 = 0.01
 
 	n_steps = 2000
 	u0 = np.array([-5.0])

@@ -202,7 +202,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
 			tau_vector, tau_value = tf.test_fn_bifurcation(F, x_new, l, r, M, prev_tau_vector, sp)
-			if prev_tau_value * tau_value < 0.0: # Bifurcation point detected
+			if prev_tau_value * tau_value < 0.0 and np.abs(tau_value) < 10.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
 				is_bf, x_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, prev_tau_vector, sp)
