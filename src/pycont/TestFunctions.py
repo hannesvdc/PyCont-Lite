@@ -1,14 +1,16 @@
 import numpy as np
 import scipy.sparse.linalg as slg
 
+from .Preconditioners import polynomial_inverse
+
 from typing import Callable, Tuple, Dict
 
 def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray], 
-						 x0 : np.ndarray, 
-						 l : np.ndarray, 
-						 r : np.ndarray, 
-						 rdiff : float, 
-						 eps_reg : float):
+						 		  x0 : np.ndarray, 
+						 		  l : np.ndarray, 
+						 		  r : np.ndarray, 
+						 		  rdiff : float, 
+						 		  eps_reg : float) -> Callable[[np.ndarray], np.ndarray]:
 	"""
 	Create the matrix-free Jacobian of F.
 
@@ -30,29 +32,16 @@ def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray],
 
 def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 						         M : int, 
-						        y_prev : np.ndarray | None) -> np.ndarray:
+						         y_prev : np.ndarray | None) -> np.ndarray:
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
-
-	# returns LinearOperator y ≈ A^{-1} b using p_m(A)=alpha*sum_{j=0}^{m-1}(I-alpha A)^j
-	def poly_inv(A_mv, alpha, m):
-		def apply(b):
-			s = b.copy()
-			vec = alpha*s
-			for _ in range(1, m):
-				s = s - alpha*A_mv(s)
-				vec = vec + alpha*s
-			return vec
-		return slg.LinearOperator((M+2,M+2), apply)
-	B_inv = poly_inv(matvec, 1.0, min(M,10))
+	preconditioner = polynomial_inverse(matvec, size=M+2, alpha=1.0, m=min(M, 10))
 
 	with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-		y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
+		y, info = slg.lgmres(sys, rhs, x0=y_prev, M=preconditioner, maxiter=20)
 
 	return y
 
-# Bifurcation Detection Test Function. We slightly regularize the system
-# for better numerical convergence behavior in L-GMRES.
 def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
 						l : np.ndarray, 
@@ -108,6 +97,8 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 		  used to detect fold points in general
 		- e_{M+2} is the M+2 - unit vector.
 	"""
+
+	
 	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
 	y = solve_bordered_system_krylov(matvec, M, y_prev)
 

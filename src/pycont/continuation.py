@@ -6,6 +6,7 @@ from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
 from .Types import ContinuationResult
+from .Tangent import computeTangent
 
 from typing import Callable, Optional, Dict, Any
 
@@ -94,7 +95,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
     initial_tangent = (u1 - u0) / rdiff
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
-    tangent = pac.computeTangent(G, u0, p0, initial_tangent, sp)
+    tangent = computeTangent(G, u0, p0, initial_tangent, sp)
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
     if mode == "both" or tangent[-1] == 0.0: # Edge case if we start on a fold point

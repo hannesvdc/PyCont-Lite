@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Trying tangent computation using Newton-Schur method** but L-GMRES still takes 10 iterations
+
+### Changed
+- **Computing tangent using bordered system** for better conditioning and improved stability
+- **Limit L-GMRES Iterations to min(M, 10)** for faster tangent computations without limiting accuracy.
+
 ## [0.2.0] - 2025-09-08
 ### Added
 - **First multidimensional example**: Bratu problem (101-point discretization) now works out of the box.
@@ -47,9 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed numerical errors in one-dimensional test cases (pitchfork, transcritical, fold).
 - Fixed event duplication by checking uniqueness tolerance.
 
----
 
-## [0.1.0] - 2025-07-??
+## [0.1.0] - 2025-07
 ### Added
 - Initial public release of **PyCont-Lite**.
 - Pseudo-arclength continuation with adaptive step control.

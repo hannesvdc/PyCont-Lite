@@ -5,73 +5,11 @@ import scipy.sparse.linalg as slg
 import scipy.optimize as opt
 
 from . import TestFunctions as tf
+from .Tangent import computeTangent
+
 from .Types import Branch, Event, makeBranch
 
 from typing import Callable, Tuple, Dict, Any, Optional
-
-def computeTangentBordered(G, u, p, prev_tangent, sp, eps_reg=1e-5):
-	rdiff = sp["rdiff"]
-	M = len(u)
-
-	G_value = G(u, p)
-	Gp = (G(u, p + rdiff) - G_value) / rdiff
-	c = prev_tangent[0:M]
-	def matvec(v):
-		J = (G(u + rdiff * v[0:M], p) - G_value) / rdiff + eps_reg * v[0:M] + Gp * v[M]
-		eq_2 = np.dot(c, v[0:M])
-		return np.append(J, eq_2)
-
-	sys = slg.LinearOperator((M+1, M+1), matvec)
-	rhs = np.zeros(M+1); rhs[M] = 1.0
-	tau, _ = slg.lgmres(sys, rhs, x0=prev_tangent)
-	tau = tau / lg.norm(tau)
-
-	return tau
-
-def computeTangent(G : Callable[[np.ndarray, float], np.ndarray], 
-				   u : np.ndarray, 
-				   p : float, 
-				   prev_tangent : np.ndarray, 
-				   sp : Dict) -> np.ndarray:
-	"""
-	This function computes the tangent to the curve at a given point by solving D_u G * tau + G_p = 0.
-	The tangent vector then is [tau, 1] with normalization, and in the direction of prev_tangent.
-
-	Parameters:
-	----------
-	G: Callable
-		The objective function.
-	u: ndarray
-		The current state variable
-	p: float 
-		The current parameter value
-	prev_tangent : ndarray
-		The previous tangent vector along the curve (used for initial guess), can be None.
-	sp: Dict
-		Solver parameters.
-
-	Returns
-	-------
-	tangent : ndarray
-		The tangent vector at (u, p).
-	"""
-	rdiff = sp["rdiff"]
-	a_tol = sp["tolerance"]
-	M = len(u)
-
-	G_value = G(u, p)
-	matvec = lambda v: (G(u + rdiff * v, p) - G_value) / rdiff
-	sys = slg.LinearOperator((M, M), matvec)
-	b = -(G(u, p + rdiff) - G_value) / rdiff
-
-	tau, _ = slg.lgmres(sys, b, x0=prev_tangent[:-1])
-	tangent = np.append(tau, 1.0)
-	tangent = tangent / lg.norm(tangent)
-
-	# Make sure the new tangent vector points in the same rough direction as the previous one
-	if np.dot(tangent, prev_tangent) < 0.0:
-		tangent = -tangent
-	return tangent
 
 def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
                  u0 : np.ndarray, 
