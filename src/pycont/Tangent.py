@@ -46,21 +46,22 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 				   prev_tangent : np.ndarray, 
 				   sp : Dict, 
 				   eps_reg=1e-5) -> np.ndarray:
-	rdiff = sp["rdiff"]
-	tolerance = sp["tolerance"]
-	M = len(u)
+    rdiff = sp["rdiff"]
+    tolerance = sp["tolerance"]
+    atol = max(tolerance, rdiff)
+    M = len(u)
 
-	# Create the linear system and right-hand side
-	G_value = G(u, p)
-	Gp = (G(u, p + rdiff) - G_value) / rdiff
-	def matvec(v):
-		J = (G(u + rdiff * v[0:M], p) - G_value) / rdiff + eps_reg * v[0:M] + Gp * v[M]
-		eq_2 = np.dot(prev_tangent, v) + eps_reg * v[M]
-		return np.append(J, eq_2)
-	sys = slg.LinearOperator((M+1, M+1), matvec)
-	rhs = np.zeros(M+1); rhs[M] = 1.0
+    # Create the linear system and right-hand side
+    G_value = G(u, p)
+    Gp = (G(u, p + rdiff) - G_value) / rdiff
+    def matvec(v):
+        J = (G(u + rdiff * v[0:M], p) - G_value) / rdiff + eps_reg * v[0:M] + Gp * v[M]
+        eq_2 = np.dot(prev_tangent, v) + eps_reg * v[M]
+        return np.append(J, eq_2)
+    sys = slg.LinearOperator((M+1, M+1), matvec)
+    rhs = np.zeros(M+1); rhs[M] = 1.0
 
 	# Solve the linear system and do postprocessing
-	tangent, _ = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10), atol=tolerance, rtol=1e-6)
-	tangent = np.sign(np.dot(tangent, prev_tangent)) * tangent / lg.norm(tangent)
-	return tangent
+    tangent, info = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10), atol=atol)
+    tangent = np.sign(np.dot(tangent, prev_tangent)) * tangent / lg.norm(tangent)
+    return tangent

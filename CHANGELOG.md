@@ -8,10 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Trying tangent computation using Newton-Schur method** but L-GMRES still takes 10 iterations
+- **Fitzhugh-Nagumo PDE** new example of a hard PDE that has a fold point and a Hopf point (to detect later).
+- **tolerance = max(a_tol, r_diff)** because we can never theoretically go below r_diff.
+- **Plotting DSFLOOR** event to provide more information.
 
 ### Changed
 - **Computing tangent using bordered system** for better conditioning and improved stability
 - **Limit L-GMRES Iterations to min(M, 10)** for faster tangent computations without limiting accuracy.
+- **Replaced ds increase/decrease logic** after Newton-Krylov solver by looking at the residual norm, not relying on scipy's crude info. Works on all examples.
 
 ## [0.2.0] - 2025-09-08
 ### Added

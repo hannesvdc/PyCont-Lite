@@ -65,10 +65,11 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	
 	# Infer parameters from inputs
 	M = len(u0)
-	a_tol = sp["tolerance"]
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]
+	a_tol = sp["tolerance"]
 	bifurcation_detection = sp["bifurcation_detection"]
+	nk_tolerance = max(a_tol, r_diff)
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
@@ -101,20 +102,26 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			# Predictor: Follow the tangent vector
 			x_p = x + tangent * ds
 
-			# Corrector: Newton-Krylov
-			try:
-				with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-					x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
+			with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+				try:
+					x_new = opt.newton_krylov(F, x_p, f_tol=nk_tolerance, rdiff=r_diff, maxiter=max_it, verbose=False)
+				except opt.NoConvergence as e:
+					x_new = e.args[0]
+			
+			# Check the residual to increase or decrease ds
+			nk_residual = lg.norm(F(x_new))
+			good_residual = np.all(np.isfinite(nk_residual))
+			if good_residual and nk_residual <= 10.0 * nk_tolerance:
 				ds = min(1.2*ds, ds_max)
 				break
-			except:
-				# Decrease arclength if the solver needs more than max_it iterations
+			else:
 				ds = max(0.5*ds, ds_min)
+
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M])
-			return makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+			return makeBranch(branch_id, termination_event, u_path[:n,:], p_path[:n]), termination_event
 		
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x[0:M], x[M], tangent, sp)
