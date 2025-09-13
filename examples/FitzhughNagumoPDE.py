@@ -54,7 +54,8 @@ def FitzhughNagumoTest():
         np.save(datafile, z0)
     print('Initial Residual:', np.linalg.norm(G(z0, eps0)))
 
-    # Do continuation
+    # Do continuation. The Fitzhugh-Nagumo equations are much worse conditioned than the Bratu PDE because
+    # the Jacbian is very non-normal. We must use a small tolerance: the default tolerance of 1e-10 works very well.
     ds_max = 0.01
     ds_min = 1e-6
     ds0 = 1e-3

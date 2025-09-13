@@ -47,7 +47,6 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 				   sp : Dict, 
 				   eps_reg=1e-5) -> np.ndarray:
     rdiff = sp["rdiff"]
-    tolerance = sp["tolerance"]
     M = len(u)
 
     # Create the linear system and right-hand side
@@ -63,6 +62,6 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 	# Solve the linear system and do postprocessing
     tangent, info = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10))
     #res = lg.norm(sys(tangent) - rhs)
-    #print('LGMRES Residual', res, atol)
+    #print('LGMRES Residual', res)
     tangent = np.sign(np.dot(tangent, prev_tangent)) * tangent / lg.norm(tangent)
     return tangent
