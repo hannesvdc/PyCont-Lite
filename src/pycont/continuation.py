@@ -92,18 +92,20 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
-    u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
+    M = len(u0)
+    with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+        u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
     initial_tangent = (u1 - u0) / rdiff
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
     tangent = computeTangent(G, u0, p0, initial_tangent, sp)
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
-    if mode == "both" or tangent[-1] == 0.0: # Edge case if we start on a fold point
+    if mode == "both" or tangent[M] == 0.0: # Edge case if we start on a fold point
         dirs = [tangent, -tangent]
     elif mode == "increase_p":
-        dirs = [tangent if tangent[-1] > 0 else -tangent]
+        dirs = [tangent if tangent[M] > 0 else -tangent]
     elif mode == "decrease_p":
-        dirs = [tangent if tangent[-1] < 0 else -tangent]
+        dirs = [tangent if tangent[M] < 0 else -tangent]
     else:
         print(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
         dirs = []

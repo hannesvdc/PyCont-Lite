@@ -42,7 +42,6 @@ def FitzhughNagumoTest():
     
     # Load the initial condition from file - otherwise compute it
     eps0 = 0.1
-    tolerance = 1e-9 # 1e-8 or below or tangent computations will be bad.
     here = pathlib.Path(__file__).parent
     datafile = here / "data" / "fhn_init.npy"
     if datafile.exists():
@@ -51,7 +50,7 @@ def FitzhughNagumoTest():
         # We know the initial condition looks like a sigmoid
         u0 = sigmoid(x, 14.0, -1, 1.0, 2.0)
         v0 = sigmoid(x, 15, 0.0, 2.0, 0.1)
-        z0 = opt.newton_krylov(lambda z : G(z, eps0), np.concatenate((u0, v0)), f_tol=tolerance, method='lgmres')
+        z0 = opt.newton_krylov(lambda z : G(z, eps0), np.concatenate((u0, v0)), f_tol=1e-9, method='lgmres')
         np.save(datafile, z0)
     print('Initial Residual:', np.linalg.norm(G(z0, eps0)))
 
@@ -60,8 +59,7 @@ def FitzhughNagumoTest():
     ds_min = 1e-6
     ds0 = 1e-3
     n_steps = 1000
-    solver_parameters = {"tolerance": tolerance}
-    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps)
 
     # Plot the bifurcation diagram eps versus <u>
     u_transform = lambda z: np.average(z[:N])

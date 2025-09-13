@@ -104,7 +104,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 			with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
 				try:
-					x_new = opt.newton_krylov(F, x_p, f_tol=nk_tolerance, rdiff=r_diff, maxiter=max_it, verbose=False)
+					x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				except opt.NoConvergence as e:
 					x_new = e.args[0]
 			
