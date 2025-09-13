@@ -211,10 +211,12 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                 return
         
         # The bifurcation point is unique, do branch switching
-        x_prev = np.append(branch.u_path[-10,:], branch.p_path[-10]) # x_prev just needs to be a point on the previous path close to the bf point
+        prev_index = -10 if len(branch.p_path) > 10 else 0 # point on the branch close enough to x_singular (with guarding for short branches)
+        x_prev = np.append(branch.u_path[prev_index,:], branch.p_path[prev_index])
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
+        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, x0[0:-1], x0[-1], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            _recursiveContinuation(G, x0[0:M], x0[M], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
