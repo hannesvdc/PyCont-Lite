@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Computing tangent using bordered system** for better conditioning and improved stability
 - **Limit L-GMRES Iterations to min(M, 10)** for faster tangent computations without limiting accuracy.
 - **Replaced ds increase/decrease logic** after Newton-Krylov solver by looking at the residual norm, not relying on scipy's crude info. Works on all examples.
+- **Branch creation and addig points**: reusing logic by function calls instead of copying code.
 
 ## [0.2.0] - 2025-09-08
 ### Added
