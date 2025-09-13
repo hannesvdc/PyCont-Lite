@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fitzhugh-Nagumo PDE** new example of a hard PDE that has a fold point and a Hopf point (to detect later).
 - **tolerance = max(a_tol, r_diff)** because we can never theoretically go below r_diff.
 - **Plotting DSFLOOR** event to provide more information.
+- **Arclength information in Branches and Events** for better plotting and debugging.
 
 ### Changed
 - **Computing tangent using bordered system** for better conditioning and improved stability
