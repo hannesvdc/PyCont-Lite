@@ -7,7 +7,7 @@ import scipy.optimize as opt
 from . import TestFunctions as tf
 from .Tangent import computeTangent
 
-from .Types import Branch, Event, makeBranch
+from .Types import Branch, Event
 
 from typing import Callable, Tuple, Dict, Any, Optional
 
@@ -73,13 +73,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
+	s = 0.0
 	tangent = initial_tangent / lg.norm(initial_tangent)
-
-	# Initialize the storage arrays
-	u_path = np.zeros((n_steps+1, M)); u_path[0,:] = u0
-	p_path = np.zeros(n_steps+1); p_path[0] = p0
-
-	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t t_p: {tangent[M]:.4f}"
+	branch = Branch(branch_id, n_steps, u0, p0)
+	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
 	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
@@ -101,6 +98,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		while ds > ds_min:
 			# Predictor: Follow the tangent vector
 			x_p = x + tangent * ds
+			new_s = s + ds
 
 			with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
 				try:
@@ -120,29 +118,30 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		else:
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
-			termination_event = Event("DSFLOOR", x[0:M], x[M])
-			return makeBranch(branch_id, termination_event, u_path[:n,:], p_path[:n]), termination_event
+			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
+			branch.termination_event = termination_event
+			return branch.trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x[0:M], x[M], tangent, sp)
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 1:
-			is_fold, x_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
+			is_fold, x_fold, alpha_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
 			if not is_fold:
 				print('Erroneous Fold Point detection due to blow-up in tangent vector.')
 			else:
 				print('Fold point at', x_fold)
 
 				# Append the fold point and x_new to the current path
-				u_path[n,:] = x_fold[0:M]
-				p_path[n] = x_fold[M]
-				u_path[n+1,:] = x_new[0:M]
-				p_path[n+1] = x_new[M]
+				s_fold = s + alpha_fold * (new_s - s)
+				branch.addPoint(x_fold[0:M], x_fold[M], s_fold)
+				branch.addPoint(x_new[0:M], x_new[M], new_s)
 				
 				# Stop continuation along this branch
-				termination_event = Event("LP", x_fold[0:M], x_fold[M], {"tangent": new_tangent})
-				return makeBranch(branch_id, termination_event, u_path[:n+2,:], p_path[:n+2]), termination_event
+				termination_event = Event("LP", x_fold[0:M], x_fold[M], s_fold, {"tangent": new_tangent})
+				branch.termination_event = termination_event
+				return branch.trim(), termination_event
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
@@ -150,13 +149,14 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			if prev_tau_value * tau_value < 0.0 and np.abs(tau_value) < 10.0: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
-				is_bf, x_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, prev_tau_vector, sp)
+				is_bf, x_singular, alpha_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, prev_tau_vector, sp)
 				if is_bf:
 					print('Bifurcation Point at', x_singular)
-					u_path[n,:] = x_singular[0:M]
-					p_path[n] = x_singular[M]
-					termination_event = Event("BP", x_singular[0:M], x_singular[M])
-					return makeBranch(branch_id, termination_event, u_path[:n+1,:], p_path[:n+1]), termination_event
+					s_singular = s + alpha_singular * (new_s - s)
+					branch.addPoint(x_singular[0:M], x_singular[M], s_singular)
+					termination_event = Event("BP", x_singular[0:M], x_singular[M], s_singular)
+					branch.termination_event = termination_event
+					return branch.trim(), termination_event
 				else:
 					print('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
 				
@@ -166,15 +166,16 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		# Bookkeeping for the next step
 		tangent = np.copy(new_tangent)
 		x = np.copy(x_new)
-		u_path[n,:] = x[0:M]
-		p_path[n] = x[M]
+		s = new_s
+		branch.addPoint(x[0:M], x[M], s)
 		
 		# Print the status
-		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t t_p: {tangent[M]:.4f}"
+		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
 		print(print_str)
 
-	termination_event = Event("MAXSTEPS", u_path[-1,:], p_path[-1])
-	return makeBranch(branch_id, termination_event, u_path, p_path), termination_event
+	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
+	branch.termination_event = termination_event
+	return branch.trim(), termination_event
 
 def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray], 
 								   x_start : np.ndarray, 
@@ -183,7 +184,7 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 								   r : np.ndarray, 
 								   tau_vector_prev : Optional[np.ndarray],
 								   sp : Dict,
-								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray]:
+								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray, float]:
 	"""
 	Localizes the bifurcation point between x_start and x_end using the bisection method.
 
@@ -221,28 +222,34 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 	# Check that a sign change really exists
 	if  tau_start * tau_end > 0.0:
 		print("No sign change detected between start and end points.")
-		return False, x_end
+		return False, x_end, -1.0
 
+	alpha_start = 0.0
+	alpha_end = 1.0
 	for _ in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
+		alpha = 0.5 * (alpha_start + alpha_end)
 		_, tau_mid = tf.test_fn_bifurcation(F, x_mid, l, r, M, tau_vector_prev, sp)
 
 		# Narrow the interval based on sign of tau
 		if tau_start * tau_mid < 0.0:
 			x_end = x_mid
+			alpha_end = alpha
 			tau_end = tau_mid
 		else:
 			x_start = x_mid
+			alpha_start = alpha
 			tau_start = tau_mid
 
 		# Convergence check
 		if np.abs(tau_mid) < a_tol:
 			print('Bisection converged', tau_mid)
-			return True, 0.5 * (x_start + x_end)
+			return True, 0.5 * (x_start + x_end), 0.5 * (alpha_start + alpha_end)
 
 	print('Warning: Bisection reached maximum steps without full convergence.')
 	x_mid = 0.5 * (x_start + x_end)
-	return np.abs(tau_mid) < 1.0, x_mid
+	alpha = 0.5 * (alpha_start + alpha_end)
+	return np.abs(tau_mid) < 1.0, x_mid, alpha
 
 def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							x_left : np.ndarray,
@@ -252,7 +259,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 							tangent_ref : np.ndarray,
 							ds : float,
 							sp : Dict,
-							max_bisect_steps : int=20) -> Tuple[bool, np.ndarray]:
+							max_bisect_steps : int=20) -> Tuple[bool, np.ndarray, float]:
 	"""
 	Localizes the fold point between x_left and x_right using the bisection method.
 
@@ -291,7 +298,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 
 	if value_left * value_right > 0.0:
 		print('Left and Right value have the same sign. Bisection will not work. Returning')
-		return False, x_left
+		return False, x_left, 0.0
 	
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
 		ds_alpha = alpha * ds
@@ -321,7 +328,7 @@ def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Convergence check
 		if np.abs(value) < a_tol:
-			return True, 0.5 * (x_left + x_right)
+			return True, 0.5 * (x_left + x_right), 0.5 * (alpha_left + alpha_right)
 		
 	print('Warning: Bisection reached maximum steps without full convergence.')
-	return np.abs(value) < 0.1, 0.5 * (x_left + x_right)
+	return np.abs(value) < 0.1, 0.5 * (x_left + x_right), 0.5 * (alpha_left + alpha_right)

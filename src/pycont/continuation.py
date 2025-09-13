@@ -112,7 +112,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
-    starting_event = pac.Event("SP", u0, p0)
+    starting_event = pac.Event("SP", u0, p0, 0.0)
     result.events.append(starting_event)
     for t0 in dirs:
         _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
