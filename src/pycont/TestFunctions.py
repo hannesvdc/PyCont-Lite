@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.sparse.linalg as slg
 
-from .Preconditioners import polynomial_inverse
-
 from typing import Callable, Tuple, Dict
 
 def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray], 
@@ -32,15 +30,15 @@ def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray],
 
 def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 						         M : int, 
-						         y_prev : np.ndarray | None) -> np.ndarray:
+						         y_prev : np.ndarray | None) -> Tuple[np.ndarray, float]:
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
-	preconditioner = polynomial_inverse(matvec, size=M+2, alpha=1.0, m=min(M, 10))
 
 	with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-		y, info = slg.lgmres(sys, rhs, x0=y_prev, M=preconditioner, maxiter=20)
+		y, info = slg.lgmres(sys, rhs, x0=y_prev, maxiter=10)
+	residual = float(np.linalg.norm(matvec(y) - rhs))
 
-	return y
+	return y, residual
 
 def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
@@ -49,7 +47,7 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 						M : int, 
 						y_prev : np.ndarray | None, 
 						sp : Dict,
-						eps_reg : float =1.e-5) -> Tuple[np.ndarray, float]:
+						eps_reg : float =1.e-2) -> Tuple[np.ndarray, float, float]:
 	"""
 	Main test function to detect a bifurcation point. Bifurcation points are 
 	locations x = (u, p) where Gu becomes singular and Gp lies in the column
@@ -100,6 +98,7 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 
 	
 	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
-	y = solve_bordered_system_krylov(matvec, M, y_prev)
+	y, residual = solve_bordered_system_krylov(matvec, M, y_prev)
+	print('Test FN', y[M+1], residual)
 
-	return y, y[M+1]
+	return y, y[M+1], residual

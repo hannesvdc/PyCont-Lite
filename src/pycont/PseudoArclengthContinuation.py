@@ -145,8 +145,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection:
-			tau_vector, tau_value = tf.test_fn_bifurcation(F, x_new, l, r, M, prev_tau_vector, sp)
-			if prev_tau_value * tau_value < 0.0 and np.abs(tau_value) < 10.0: # Bifurcation point detected
+			tau_vector, tau_value, tau_residual = tf.test_fn_bifurcation(F, x_new, l, r, M, prev_tau_vector, sp)
+			if prev_tau_value * tau_value < 0.0 and np.abs(tau_value) < 10.0 and tau_residual < 0.01: # Bifurcation point detected
 				print('Sign change detected', prev_tau_value, tau_value)
 
 				is_bf, x_singular, alpha_singular = _computeBifurcationPointBisect(F, x, x_new, l, r, prev_tau_vector, sp)
@@ -216,8 +216,8 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 	M = len(x_start) - 1
 
 	# Compute tau at start and end
-	_, tau_start = tf.test_fn_bifurcation(F, x_start, l, r, M, tau_vector_prev, sp)
-	_, tau_end = tf.test_fn_bifurcation(F, x_end, l, r, M, tau_vector_prev, sp)
+	_, tau_start, _ = tf.test_fn_bifurcation(F, x_start, l, r, M, tau_vector_prev, sp)
+	_, tau_end, _ = tf.test_fn_bifurcation(F, x_end, l, r, M, tau_vector_prev, sp)
 
 	# Check that a sign change really exists
 	if  tau_start * tau_end > 0.0:
@@ -229,7 +229,7 @@ def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray],
 	for _ in range(max_bisect_steps):
 		x_mid = 0.5 * (x_start + x_end)
 		alpha = 0.5 * (alpha_start + alpha_end)
-		_, tau_mid = tf.test_fn_bifurcation(F, x_mid, l, r, M, tau_vector_prev, sp)
+		_, tau_mid, _ = tf.test_fn_bifurcation(F, x_mid, l, r, M, tau_vector_prev, sp)
 
 		# Narrow the interval based on sign of tau
 		if tau_start * tau_mid < 0.0:
