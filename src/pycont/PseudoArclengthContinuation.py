@@ -69,6 +69,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	r_diff = sp["rdiff"]
 	a_tol = sp["tolerance"]
 	bifurcation_detection = sp["bifurcation_detection"]
+	param_min = sp["param_min"]
+	param_max = sp["param_max"]
 	nk_tolerance = max(a_tol, r_diff)
 
 	# Initialize a point on the path
@@ -119,6 +121,16 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			# This case should never happpen under normal circumstances
 			print('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
+			branch.termination_event = termination_event
+			return branch.trim(), termination_event
+		
+		# Check that the new point does not exceed param_min or param_max, if supplied
+		if param_min is not None and x_new[M] < param_min:
+			termination_event = Event("PARAM_MIN", x_new[0:M], x_new[M], new_s)
+			branch.termination_event = termination_event
+			return branch.trim(), termination_event
+		if param_max is not None and x_new[M] > param_max:
+			termination_event = Event("PARAM_MAX", x_new[0:M], x_new[M], new_s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
 		

@@ -5,7 +5,7 @@ import scipy.optimize as opt
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
-from .Types import ContinuationResult
+from .Types import ContinuationResult, Event
 from .Tangent import computeTangent
 
 from typing import Callable, Optional, Dict, Any
@@ -61,6 +61,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         - "initial_directions" : str (default 'both')
             Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
             'decrease_p' respectively. Default is 'both'.
+        - "param_min" : float (default None)
+            User-speficied minimal allowed parameter value. Continuation will not go lower than this limit.
+        - "param_max" : float (default None)
+            User-speficied maximal allowed parameter value. Continuation will not go higher than this limit.
 
     Returns
     -------
@@ -89,6 +93,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     sp.setdefault("bifurcation_detection", True)
     sp.setdefault("analyze_stability", True)
     mode = sp.setdefault("initial_directions", "both").lower()
+    param_min = sp.setdefault("param_min", None)
+    param_max = sp.setdefault("param_max", None)
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
@@ -110,9 +116,19 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         print(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
         dirs = []
 
+    # Filter the initial directions based on param_min / param_max if they are set
+    valid_dirs = []
+    for direction in dirs:
+        if param_min is not None and p0 <= param_min and direction[M] < 0.0:
+            continue
+        if param_max is not None and p0 >= param_max and direction[M] > 0.0:
+            continue
+        valid_dirs.append(direction)
+    dirs = valid_dirs
+
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
-    starting_event = pac.Event("SP", u0, p0, 0.0)
+    starting_event = Event("SP", u0, p0, 0.0)
     result.events.append(starting_event)
     for t0 in dirs:
         _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
