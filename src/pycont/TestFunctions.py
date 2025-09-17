@@ -22,8 +22,12 @@ def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray],
 
 	def matvec(w):
 		w_x = w[0:Mp1]
-		el1 = (F(x0 + rdiff * w_x) - F0) / rdiff + eps_reg * w_x + r*w[Mp1]
-		el2 = np.dot(l, w_x) + eps_reg * w[Mp1]
+		norm_wx = np.linalg.norm(w_x)
+		if norm_wx == 0.0:
+			el1 = r*w[Mp1]
+		else:
+			el1 = (F(x0 + rdiff * w_x / norm_wx) - F(x0 - rdiff * w_x / norm_wx)) / (2.0 * rdiff / norm_wx) + r*w[Mp1]
+		el2 = np.dot(l, w_x)
 		return np.concatenate([el1, [el2]])
 
 	return matvec
@@ -34,8 +38,9 @@ def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
 
+	maxiter = M+2 if M <= 10 else 20
 	with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-		y, info = slg.lgmres(sys, rhs, x0=y_prev, maxiter=10)
+		y, info = slg.lgmres(sys, rhs, x0=y_prev)
 	residual = float(np.linalg.norm(matvec(y) - rhs))
 
 	return y, residual
@@ -47,7 +52,7 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 						M : int, 
 						y_prev : np.ndarray | None, 
 						sp : Dict,
-						eps_reg : float =1.e-2) -> Tuple[np.ndarray, float, float]:
+						eps_reg : float =0) -> Tuple[np.ndarray, float, float]:
 	"""
 	Main test function to detect a bifurcation point. Bifurcation points are 
 	locations x = (u, p) where Gu becomes singular and Gp lies in the column

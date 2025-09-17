@@ -69,8 +69,8 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     
     # Solve beta = 0. This is the location of the bifurcation point.
     try:
-        print(BFObjective(-15.0), BFObjective(15.0))
-        alpha_singular, result = opt.brentq(BFObjective, -15.0, 15.0, full_output=True, disp=False)
+        print(BFObjective(-5.0), BFObjective(5.0))
+        alpha_singular, result = opt.brentq(BFObjective, -5.0, 5.0, full_output=True, disp=False)
     except ValueError: # No sign change detected
         return False, x_end, 1.0
     except opt.NoConvergence:
