@@ -1,12 +1,5 @@
-import pathlib
-
 import numpy as np
-import scipy.optimize as opt
-
 import pycont
-
-def sigmoid(x_array, x_center=0.0, y_center=0.0, x_scale=1.0, y_scale=1.0):
-    return y_scale / (1.0 + np.exp(-(x_array  - x_center)/x_scale)) + y_center
 
 def laplace_neumann(u, dx):
     u_ext = np.hstack([u[1], u, u[-2]])  # reflective ghosts
