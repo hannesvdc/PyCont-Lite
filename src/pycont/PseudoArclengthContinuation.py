@@ -3,7 +3,7 @@ import numpy.linalg as lg
 import numpy.random as rd
 import scipy.optimize as opt
 
-from .Tangent import computeTangent
+from .Tangent import computeTangent, computeFoldPoint
 from .Bifurcation import computeBifurcationPoint, test_fn_jacobian
 
 from .Types import Branch, Event
@@ -188,57 +188,3 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
 	branch.termination_event = termination_event
 	return branch.trim(), termination_event
-
-def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
-					  x_left : np.ndarray,
-					  x_right : np.ndarray,
-					  tangent_ref : np.ndarray,
-					  ds : float,
-					  sp : Dict) -> Tuple[bool, np.ndarray, float]:
-	"""
-	Localizes the bifurcation point between x_start and x_end using the bisection method.
-
-    Parameters
-	----------
-        G: Callable
-			Objective function with signature ``G(u,p) -> ndarray``
-        x_left : ndarray 
-			Starting point (u, p) to the 'left' of the fold point.
-        x_right : ndarray 
-			End point (u, p) to the 'right' of the fold point.
-        tangent_ref : ndarray
-			A reference tangent vector to speed up tangent calculations. Typically the 
-			tangent vector at x_left.
-		sp : Dict
-			Solver parameters.
-
-    Returns
-	-------
-		is_fold_point : boolean
-			True if we detected an antual fold point.
-        x_fold: ndarray
-			The location of the fold point within the tolerance.
-	"""
-	rdiff = sp["rdiff"]
-
-	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
-		ds_alpha = alpha * ds
-		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
-		F = lambda q: np.append(G(q[0:-1], q[-1]), N(q))
-		return F
-	def finalTangentComponent(alpha):
-		F = make_F_ext(alpha)
-		with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-			x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(G, x_alpha[0:-1], x_alpha[-1], tangent_ref, sp)
-		return tangent[-1]
-	
-	try:
-		alpha_fold, result = opt.brentq(finalTangentComponent, -2.0, 2.0, full_output=True, disp=False)
-	except ValueError: # No sign change detected
-		return False, x_right, 1.0
-	except opt.NoConvergence:
-		return False, x_left, 1.0
-	
-	x_fold = x_left + alpha_fold * (x_right - x_left)
-	return True, x_fold, alpha_fold
