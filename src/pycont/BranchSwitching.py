@@ -187,7 +187,7 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Create gradient functions
     rdiff = sp["rdiff"]
-    Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff
+    Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff # TODO Make both exactly linear
     Gp = lambda u, p: (G(u, p + rdiff) - G(u, p)) / rdiff
 
     # Computing necessary coefficients and vectors
