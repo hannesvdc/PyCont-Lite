@@ -87,7 +87,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
-    rdiff = sp.setdefault("rdiff", 1e-8)
+    rdiff = sp.setdefault("rdiff", 1e-5)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)
@@ -235,4 +235,5 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, x0[0:M], x0[M], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            tangent = computeTangent(G, x0[0:M], x0[M], tangents[n], sp)
+            _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)

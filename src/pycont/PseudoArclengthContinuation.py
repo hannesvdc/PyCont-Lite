@@ -47,7 +47,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
         Initial continuation step size.
     n_steps : int
         Maximum number of continuation steps to perform.
-	branch_id : int
+	branch_id : int 
 		Integer identifier of the current branch.
     sp : dict
 		Additional paramters for PyCont.
@@ -75,7 +75,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	# Initialize a point on the path
 	x = np.append(u0, p0)
 	s = 0.0
-	tangent = computeTangent(G, u0, p0, initial_tangent / lg.norm(initial_tangent), sp)
+	tangent = initial_tangent / lg.norm(initial_tangent)
 	branch = Branch(branch_id, n_steps, u0, p0)
 	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
 	print(print_str)
@@ -155,7 +155,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				return branch.trim(), termination_event
 
 		# Do bifurcation detection in the new point
-		if bifurcation_detection:
+		if bifurcation_detection and n % 5 == 0:
 			bf_w_vector, bf_w_value = test_fn_jacobian(F, x_new, l, r, M, prev_bf_w_vector, sp)
 
 			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 5000.0 or np.abs(prev_bf_w_value) < 5000.0): # Possible bifurcation point detected
