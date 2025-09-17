@@ -30,7 +30,7 @@ def AllenCahnTest():
 
     # Do continuation
     tolerance = 1e-9
-    ds_max = 1e-3
+    ds_max = 1e-2
     ds_min = 1e-6
     ds0 = 1e-4
     n_steps = 1000

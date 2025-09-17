@@ -38,9 +38,11 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
     for event in cr.events:
         if event.kind in style.keys():
             plt.plot(event.p, u_transform(event.u), style[event.kind], label=event.kind)
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), loc='best')
 
     plt.grid(visible=True)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.legend()
     plt.show()	
