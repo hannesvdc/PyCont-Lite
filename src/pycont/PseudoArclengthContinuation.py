@@ -97,10 +97,12 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
+			
 			# Predictor: Follow the tangent vector
 			x_p = x + tangent * ds
 			new_s = s + ds
 
+			# Corrector
 			with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
 				try:
 					x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
