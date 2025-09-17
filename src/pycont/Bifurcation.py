@@ -78,26 +78,3 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     x_singular = x_start + alpha_singular * x_diff
 
     return True, x_singular, alpha_singular
-
-# def computeBifurcationPointJacobian(F : Callable[[np.ndarray], np.ndarray], 
-# 							        x_start : np.ndarray,
-#                                     x_end : np.ndarray,
-#                                     l : np.ndarray, 
-#                                     r : np.ndarray,
-#                                     w : np.ndarray,
-#                                     M : int,
-#                                     sp : Dict) -> Tuple[bool, np.ndarray, float]:
-#     x_diff = x_end - x_start
-    
-#     # Build the Bisection Objective Function
-#     def BFObjective(alpha : float) -> float:
-#         x = x_start + alpha * x_diff
-#         _, beta, _ = test_fn_jacobian(F, x, l, r, M, w, sp, accurate=True)
-#         return beta
-    
-#     # Do BrentQ to find the zero
-#     alpha_bp = bisect(BFObjective, -5.0, 5.0)
-
-#     x_singular = x_start + alpha_bp * x_diff
-
-#     return True, x_singular, 0.0
