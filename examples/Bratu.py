@@ -29,7 +29,7 @@ def BratuTest():
     ds_min = 1e-6
     ds0 = 1e-4
     n_steps = 2000
-    solver_parameters = {"tolerance": 1e-10}
+    solver_parameters = {"tolerance": 1e-6, "param_min" : 0.0}
     continuation_result = pycont.arclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
     # Print some Internal info

@@ -86,6 +86,7 @@ continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds
 # Plot the curves
 pycont.plotBifurcationDiagram(continuation_result)
 ```
+
 <p align="center">
     <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/Fold.png" width="400">
 </p>

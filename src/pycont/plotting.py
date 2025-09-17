@@ -34,7 +34,7 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
         plt.plot(branch.p_path, u_vals, color='tab:blue', linestyle=linestyle)
 		
     # Plot all interesting points
-    style = {"SP" : 'go', "LP" : 'bo', "BP" : 'ro'}
+    style = {"SP" : 'go', "LP" : 'bo', "BP" : 'ro', "DSFLOOR": 'mo'}
     for event in cr.events:
         if event.kind in style.keys():
             plt.plot(event.p, u_transform(event.u), style[event.kind], label=event.kind)

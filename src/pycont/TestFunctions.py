@@ -4,11 +4,11 @@ import scipy.sparse.linalg as slg
 from typing import Callable, Tuple, Dict
 
 def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray], 
-						 x0 : np.ndarray, 
-						 l : np.ndarray, 
-						 r : np.ndarray, 
-						 rdiff : float, 
-						 eps_reg : float):
+						 		  x0 : np.ndarray, 
+						 		  l : np.ndarray, 
+						 		  r : np.ndarray, 
+						 		  rdiff : float, 
+						 		  eps_reg : float) -> Callable[[np.ndarray], np.ndarray]:
 	"""
 	Create the matrix-free Jacobian of F.
 
@@ -22,37 +22,29 @@ def make_bordered_jacobian_system(F : Callable[[np.ndarray], np.ndarray],
 
 	def matvec(w):
 		w_x = w[0:Mp1]
-		el1 = (F(x0 + rdiff * w_x) - F0) / rdiff + eps_reg * w_x + r*w[Mp1]
-		el2 = np.dot(l, w_x) + eps_reg * w[Mp1]
+		norm_wx = np.linalg.norm(w_x)
+		if norm_wx == 0.0:
+			el1 = r*w[Mp1]
+		else:
+			el1 = (F(x0 + rdiff * w_x / norm_wx) - F(x0 - rdiff * w_x / norm_wx)) / (2.0 * rdiff / norm_wx) + r*w[Mp1]
+		el2 = np.dot(l, w_x)
 		return np.concatenate([el1, [el2]])
 
 	return matvec
 
 def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 						         M : int, 
-						        y_prev : np.ndarray | None) -> np.ndarray:
+						         y_prev : np.ndarray | None) -> Tuple[np.ndarray, float]:
 	sys = slg.LinearOperator((M+2, M+2), matvec)
 	rhs = np.zeros(M+2); rhs[M+1] = 1.0
 
-	# returns LinearOperator y ≈ A^{-1} b using p_m(A)=alpha*sum_{j=0}^{m-1}(I-alpha A)^j
-	def poly_inv(A_mv, alpha, m):
-		def apply(b):
-			s = b.copy()
-			vec = alpha*s
-			for _ in range(1, m):
-				s = s - alpha*A_mv(s)
-				vec = vec + alpha*s
-			return vec
-		return slg.LinearOperator((M+2,M+2), apply)
-	B_inv = poly_inv(matvec, 1.0, min(M,10))
-
+	maxiter = M+2 if M <= 10 else 20
 	with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-		y, _ = slg.lgmres(sys, rhs, x0=y_prev, M=B_inv, maxiter=10000)
+		y, info = slg.lgmres(sys, rhs, x0=y_prev)
+	residual = float(np.linalg.norm(matvec(y) - rhs))
 
-	return y
+	return y, residual
 
-# Bifurcation Detection Test Function. We slightly regularize the system
-# for better numerical convergence behavior in L-GMRES.
 def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
 						l : np.ndarray, 
@@ -60,7 +52,7 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 						M : int, 
 						y_prev : np.ndarray | None, 
 						sp : Dict,
-						eps_reg : float =1.e-5) -> Tuple[np.ndarray, float]:
+						eps_reg : float =0) -> Tuple[np.ndarray, float, float]:
 	"""
 	Main test function to detect a bifurcation point. Bifurcation points are 
 	locations x = (u, p) where Gu becomes singular and Gp lies in the column
@@ -108,7 +100,10 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 		  used to detect fold points in general
 		- e_{M+2} is the M+2 - unit vector.
 	"""
-	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
-	y = solve_bordered_system_krylov(matvec, M, y_prev)
 
-	return y, y[M+1]
+	
+	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
+	y, residual = solve_bordered_system_krylov(matvec, M, y_prev)
+	print('Test FN', y[M+1], residual)
+
+	return y, y[M+1], residual

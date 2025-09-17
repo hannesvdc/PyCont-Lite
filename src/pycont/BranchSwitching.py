@@ -187,12 +187,17 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Create gradient functions
     rdiff = sp["rdiff"]
-    Gu_v = lambda u, p, v: (G(u + rdiff * v, p) - G(u, p)) / rdiff
-    Gp = lambda u, p: (G(u, p + rdiff) - G(u, p)) / rdiff
+    def Gu_v(u : np.ndarray, p : float, v : np.ndarray) -> np.ndarray:
+        norm_v = lg.norm(v)
+        if norm_v == 0.:
+            return np.zeros_like(u)
+        eps = rdiff / norm_v
+        return (G(u + eps * v, p) - G(u - eps * v, p)) / (2.0 * eps)
+    Gp = lambda u, p: (G(u, p + rdiff) - G(u, p - rdiff)) / (2.0 * rdiff)
 
     # Computing necessary coefficients and vectors
-    phi, w, w_1 =_computeNullspace(lambda v: Gu_v(u, p, v), Gp(u,p), M, sp["rdiff"])
-    a, b, c = _computeCoefficients(Gu_v, Gp, x_singular, phi, w, w_1, M, sp["rdiff"])
+    phi, w, w_1 =_computeNullspace(lambda v: Gu_v(u, p, v), Gp(u,p), M, rdiff)
+    a, b, c = _computeCoefficients(Gu_v, Gp, x_singular, phi, w, w_1, M, rdiff)
     solutions = _solveABSystem(a, b, c)
 
     # Fina all 4 branch tangents

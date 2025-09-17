@@ -5,7 +5,8 @@ import scipy.optimize as opt
 from . import PseudoArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
-from .Types import ContinuationResult
+from .Types import ContinuationResult, Event
+from .Tangent import computeTangent
 
 from typing import Callable, Optional, Dict, Any
 
@@ -60,6 +61,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         - "initial_directions" : str (default 'both')
             Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
             'decrease_p' respectively. Default is 'both'.
+        - "param_min" : float (default None)
+            User-speficied minimal allowed parameter value. Continuation will not go lower than this limit.
+        - "param_max" : float (default None)
+            User-speficied maximal allowed parameter value. Continuation will not go higher than this limit.
 
     Returns
     -------
@@ -82,34 +87,48 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
-    rdiff = sp.setdefault("rdiff", 1e-8)
+    rdiff = sp.setdefault("rdiff", 1e-5)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)
     sp.setdefault("analyze_stability", True)
     mode = sp.setdefault("initial_directions", "both").lower()
+    param_min = sp.setdefault("param_min", None)
+    param_max = sp.setdefault("param_max", None)
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
-    u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
+    M = len(u0)
+    with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+        u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
     initial_tangent = (u1 - u0) / rdiff
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
-    tangent = pac.computeTangent(G, u0, p0, initial_tangent, sp)
+    tangent = computeTangent(G, u0, p0, initial_tangent, sp)
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
-    if mode == "both" or tangent[-1] == 0.0: # Edge case if we start on a fold point
+    if mode == "both" or tangent[M] == 0.0: # Edge case if we start on a fold point
         dirs = [tangent, -tangent]
     elif mode == "increase_p":
-        dirs = [tangent if tangent[-1] > 0 else -tangent]
+        dirs = [tangent if tangent[M] > 0 else -tangent]
     elif mode == "decrease_p":
-        dirs = [tangent if tangent[-1] < 0 else -tangent]
+        dirs = [tangent if tangent[M] < 0 else -tangent]
     else:
         print(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
         dirs = []
 
+    # Filter the initial directions based on param_min / param_max if they are set
+    valid_dirs = []
+    for direction in dirs:
+        if param_min is not None and p0 <= param_min and direction[M] < 0.0:
+            continue
+        if param_max is not None and p0 >= param_max and direction[M] > 0.0:
+            continue
+        valid_dirs.append(direction)
+    dirs = valid_dirs
+
     # Do continuation in both directions of the tangent
     result = ContinuationResult()
-    starting_event = pac.Event("SP", u0, p0)
+    starting_event = Event("SP", u0, p0, 0.0)
     result.events.append(starting_event)
     for t0 in dirs:
         _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
@@ -208,10 +227,13 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                 return
         
         # The bifurcation point is unique, do branch switching
-        x_prev = np.append(branch.u_path[-10,:], branch.p_path[-10]) # x_prev just needs to be a point on the previous path close to the bf point
+        prev_index = -10 if len(branch.p_path) > 10 else 0 # point on the branch close enough to x_singular (with guarding for short branches)
+        x_prev = np.append(branch.u_path[prev_index,:], branch.p_path[prev_index])
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
+        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
-            _recursiveContinuation(G, x0[0:-1], x0[-1], tangents[n], ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            tangent = computeTangent(G, x0[0:M], x0[M], tangents[n], sp)
+            _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)

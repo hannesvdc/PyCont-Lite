@@ -6,6 +6,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Trying tangent computation using Newton-Schur method** but L-GMRES still takes 10 iterations
+- **Fitzhugh-Nagumo PDE** new example of a hard PDE that has a fold point and a Hopf point (to detect later).
+- **tolerance = max(a_tol, r_diff)** because we can never theoretically go below r_diff.
+- **Plotting DSFLOOR** event to provide more information.
+- **Arclength information in Branches and Events** for better plotting and debugging.
+- **BrentQ-based optimizer** for fold and bifurcation point localization.
+- **Newton-Krylov corrector** for LGMRES in tangent computation, test function evaluation and bifurcation point detection algorithms.
+
+### Moved
+- **Test function and BP Localizer** to new Bifurcation.py
+- **Fold point localizer** to Tangent.py
+
+### Changed
+- **Computing tangent using bordered system** for better conditioning and improved stability
+- **Limit L-GMRES Iterations to min(M, 10)** for faster tangent computations without limiting accuracy.
+- **Replaced ds increase/decrease logic** after Newton-Krylov solver by looking at the residual norm, not relying on scipy's crude info. Works on all examples.
+- **Branch creation and addig points**: reusing logic by function calls instead of copying code.
+- **Replaced Bifurcation Detection** with a stable sign-change detector based on the Jacobian of the extended objective function.
+
+### Removed
+- **Slow bisection-based localizer** for folds and bifurcation points.
+
 ## [0.2.0] - 2025-09-08
 ### Added
 - **First multidimensional example**: Bratu problem (101-point discretization) now works out of the box.
@@ -47,7 +70,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed numerical errors in one-dimensional test cases (pitchfork, transcritical, fold).
 - Fixed event duplication by checking uniqueness tolerance.
 
----
 
 ## [0.1.0] - 2025-07
 ### Added
