@@ -9,7 +9,7 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
 					 l : np.ndarray, 
 					 r : np.ndarray, 
 					 M : int, 
-					 w_prev : np.ndarray | None, 
+					 w_prev : np.ndarray, 
 					 sp : Dict) -> Tuple[np.ndarray, float]:
     rdiff = sp["rdiff"]
     maxiter = M if M < 10 else 10
@@ -23,14 +23,14 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
       
     # Solve the linear system using L-GMRES. If the residual is too large, refine with Newton-Krylov.
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-        w_solution, info = slg.lgmres(sys, r, x0=w_prev, maxiter=maxiter)
+        w_solution, _ = slg.lgmres(sys, r, x0=w_prev, maxiter=maxiter)
     residual = float(np.linalg.norm(matvec(w_solution) - r))
     if residual > 0.01:
         F_NK = lambda w: matvec(w) - r
         w_solution = opt.newton_krylov(F_NK, w_solution, rdiff=rdiff, verbose=False)
         residual = np.linalg.norm(F_NK(w_solution))
     beta = -1.0 / np.dot(l, w_solution)
-    print('Test FN', beta, residual, info)
+    print('Test FN', beta, residual)
 
     return w_solution, beta
 

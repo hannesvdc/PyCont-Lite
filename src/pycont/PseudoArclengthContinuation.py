@@ -86,7 +86,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	l = rng.normal(0.0, 1.0, M+1); l = l / lg.norm(l)
 	r = r - np.dot(r, tangent) * tangent; r = r / lg.norm(r)
 	l = l - np.dot(l, tangent) * tangent; l = l / lg.norm(l)
-	prev_bf_w_vector = None
+	prev_bf_w_vector = np.zeros(M+1)
 	prev_bf_w_value = 0.0
 
 	for n in range(1, n_steps+1):
