@@ -4,7 +4,7 @@ import numpy.random as rd
 import scipy.optimize as opt
 
 from .Tangent import computeTangent
-from .Bifurcation import computeBifurcationPointH, test_fn_jacobian
+from .Bifurcation import computeBifurcationPoint, test_fn_jacobian
 
 from .Types import Branch, Event
 
@@ -138,8 +138,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 5:
-			#is_fold, x_fold, alpha_fold = _computeFoldPointBisect(G, x, x_new, tangent[M], new_tangent[M], tangent, ds, sp)
-			is_fold_point, x_fold, alpha_fold = _computeFoldPoint(G, x, x_new, new_tangent, ds, sp)
+			is_fold_point, x_fold, alpha_fold = computeFoldPoint(G, x, x_new, new_tangent, ds, sp)
 			if not is_fold_point:
 				print('Erroneous Fold Point detection due to blow-up in tangent vector.')
 			else:
@@ -159,10 +158,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		if bifurcation_detection:
 			bf_w_vector, bf_w_value = test_fn_jacobian(F, x_new, l, r, M, prev_bf_w_vector, sp)
 
-			if prev_bf_w_value * bf_w_value < 0.0 and np.abs(bf_w_value) < 1000.0: # Possible bifurcation point detected
-				print('Sign change detected', prev_bf_w_vector, bf_w_value)
+			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 5000.0 or np.abs(prev_bf_w_value) < 5000.0): # Possible bifurcation point detected
+				print('Sign change detected', prev_bf_w_value, bf_w_value)
 
-				is_bf_point, x_singular, alpha_singular = computeBifurcationPointH(F, x, x_new, l, r, bf_w_vector, M, sp)
+				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, x, x_new, l, r, bf_w_vector, M, sp)
 				if is_bf_point:
 					print('Bifurcation Point at', x_singular)
 					s_singular = s + alpha_singular * (new_s - s)
@@ -190,86 +189,36 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	branch.termination_event = termination_event
 	return branch.trim(), termination_event
 
-# def _computeBifurcationPointBisect(F : Callable[[np.ndarray], np.ndarray], 
-# 								   x_start : np.ndarray, 
-# 								   x_end : np.ndarray, 
-# 								   l : np.ndarray, 
-# 								   r : np.ndarray, 
-# 								   tau_vector_prev : Optional[np.ndarray],
-# 								   sp : Dict,
-# 								   max_bisect_steps : int=30) -> Tuple[bool, np.ndarray, float]:
-# 	"""
-# 	Localizes the bifurcation point between x_start and x_end using the bisection method.
-
-#     Parameters
-# 	----------
-#         F: Callable
-# 			Extended objective function with signature ``F(x) -> ndarray`` where `x=(u,p)` is the full state vector.
-#         x_start : ndarray 
-# 			Starting point (u, p) to the 'left' of the bifurcation point.
-#         x_end : ndarray 
-# 			End point (u, p) to the 'right' of the bifurcation point.
-#         l, r : ndarray
-# 			Random vectors used during bifurcation detection.
-#         tau_vector_prev : ndarray
-# 			Previous tau_vector in x_start used for bifurcation detection, can be None.
-# 		sp : Dict
-# 			Solver parameters.
-#         max_bisect_steps : int
-# 			Maximum allowed number of bisection steps.
-
-#     Returns
-# 	-------
-# 		is_bf : boolean
-# 			True if there is an actual sign change in the test function, False for a fold point.
-#         x_bifurcation: ndarray (M+1,)
-# 			The location of the bifurcation point within the tolerance a_tol.
-#     """
-# 	a_tol = sp["tolerance"]
-# 	M = len(x_start) - 1
-
-# 	# Compute tau at start and end
-# 	_, tau_start, _ = test_fn_jacobian(F, x_start, l, r, M, tau_vector_prev, sp)
-# 	_, tau_end, _ = test_fn_jacobian(F, x_end, l, r, M, tau_vector_prev, sp)
-
-# 	# Check that a sign change really exists
-# 	if  tau_start * tau_end > 0.0:
-# 		print("No sign change detected between start and end points.")
-# 		return False, x_end, -1.0
-
-# 	alpha_start = 0.0
-# 	alpha_end = 1.0
-# 	for _ in range(max_bisect_steps):
-# 		x_mid = 0.5 * (x_start + x_end)
-# 		alpha = 0.5 * (alpha_start + alpha_end)
-# 		_, tau_mid, _ = test_fn_jacobian(F, x_mid, l, r, M, tau_vector_prev, sp)
-
-# 		# Narrow the interval based on sign of tau
-# 		if tau_start * tau_mid < 0.0:
-# 			x_end = x_mid
-# 			alpha_end = alpha
-# 			tau_end = tau_mid
-# 		else:
-# 			x_start = x_mid
-# 			alpha_start = alpha
-# 			tau_start = tau_mid
-
-# 		# Convergence check
-# 		if np.abs(tau_mid) < a_tol:
-# 			print('Bisection converged', tau_mid)
-# 			return True, 0.5 * (x_start + x_end), 0.5 * (alpha_start + alpha_end)
-
-# 	print('Warning: Bisection reached maximum steps without full convergence.')
-# 	x_mid = 0.5 * (x_start + x_end)
-# 	alpha = 0.5 * (alpha_start + alpha_end)
-# 	return True, x_mid, alpha # np.abs(tau_mid) < 1.0
-
-def _computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
+def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 					  x_left : np.ndarray,
 					  x_right : np.ndarray,
 					  tangent_ref : np.ndarray,
 					  ds : float,
 					  sp : Dict) -> Tuple[bool, np.ndarray, float]:
+	"""
+	Localizes the bifurcation point between x_start and x_end using the bisection method.
+
+    Parameters
+	----------
+        G: Callable
+			Objective function with signature ``G(u,p) -> ndarray``
+        x_left : ndarray 
+			Starting point (u, p) to the 'left' of the fold point.
+        x_right : ndarray 
+			End point (u, p) to the 'right' of the fold point.
+        tangent_ref : ndarray
+			A reference tangent vector to speed up tangent calculations. Typically the 
+			tangent vector at x_left.
+		sp : Dict
+			Solver parameters.
+
+    Returns
+	-------
+		is_fold_point : boolean
+			True if we detected an antual fold point.
+        x_fold: ndarray
+			The location of the fold point within the tolerance.
+	"""
 	rdiff = sp["rdiff"]
 
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
@@ -293,86 +242,3 @@ def _computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 	
 	x_fold = x_left + alpha_fold * (x_right - x_left)
 	return True, x_fold, alpha_fold
-	
-
-def _computeFoldPointBisect(G : Callable[[np.ndarray, float], np.ndarray],
-							x_left : np.ndarray,
-							x_right : np.ndarray,
-							value_left : float,
-							value_right : float,
-							tangent_ref : np.ndarray,
-							ds : float,
-							sp : Dict,
-							max_bisect_steps : int=20) -> Tuple[bool, np.ndarray, float]:
-	"""
-	Localizes the fold point between x_left and x_right using the bisection method.
-
-    Parameters
-	----------
-        G : callable
-			Function representing the nonlinear system, with signature
-			``G(u, p) -> ndarray`` where `u` is the state vector and `p`
-			is the continuation parameter.
-        x_left : ndarray 
-			Starting point (u, p) to the 'left' of the bifurcation point.
-        x_right : ndarray 
-			End point (u, p) to the 'right' of the bifurcation point.
-        value_left : float
-			Tangent value at x_left.
-		value_right : float
-			Tangent value at x_right.
-		tangent_ref : np.ndarray
-			Reference tangent (typically at x_left) to speed up tangent computations.
-		ds : float
-			Total arclength between x_left and x_right.
-        sp : Dict
-			Solver parameters.
-        max_bisect_steps : int
-			Maximum allowed number of bisection steps.
-
-    Returns
-	-------
-		is_fold : bool
-			True if the bisection algorithm found a fold point, False otherwise.
-        x_fold: ndarray
-			The location of the fold point within the tolerance a_tol.
-    """
-	a_tol = sp["tolerance"]
-	rdiff = sp["rdiff"]
-
-	if value_left * value_right > 0.0:
-		print('Left and Right value have the same sign. Bisection will not work. Returning')
-		return False, x_left, 0.0
-	
-	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
-		ds_alpha = alpha * ds
-		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
-		F = lambda q: np.append(G(q[0:-1], q[-1]), N(q))
-		return F
-	def finalTangentComponent(alpha):
-		F = make_F_ext(alpha)
-		with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-			x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(G, x_alpha[0:-1], x_alpha[-1], tangent_ref, sp)
-		return tangent[-1], x_alpha
-	
-	alpha_left, alpha_right = 0.0, 1.0
-	for _ in range(max_bisect_steps):
-		alpha = 0.5 * (alpha_left + alpha_right)
-		value, x_alpha = finalTangentComponent(alpha)
-
-		if value * value_left < 0.0:
-			alpha_right = alpha
-			value_right = value
-			x_right = x_alpha
-		else:
-			alpha_left = alpha
-			value_left = value
-			x_left = x_alpha
-
-		# Convergence check
-		if np.abs(value) < a_tol:
-			return True, 0.5 * (x_left + x_right), 0.5 * (alpha_left + alpha_right)
-		
-	print('Warning: Bisection reached maximum steps without full convergence.')
-	return np.abs(value) < 0.1, 0.5 * (x_left + x_right), 0.5 * (alpha_left + alpha_right)
