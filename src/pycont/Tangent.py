@@ -31,7 +31,7 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 	# Solve the linear system and do postprocessing
     tangent, info = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10))
     tangent_residual = lg.norm(sys(tangent) - rhs)
-    LOG.verbose(f'Tangent LGMRES Residual {tangent_residual}')
+    LOG.verbose(f'Tangent LGMRES Residual {tangent_residual}, {info}')
     if tangent_residual > 0.01:
         # Solve the linear system using Newton-Krylov with much better lgmres arguments
         def F(v):
