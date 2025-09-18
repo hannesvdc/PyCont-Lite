@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.optimize as opt
-import scipy.sparse.linalg as slg
 
 from typing import Callable, Tuple, Dict
 
@@ -8,7 +7,6 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
 					 x : np.ndarray,
 					 l : np.ndarray, 
 					 r : np.ndarray, 
-					 M : int, 
 					 w_prev : np.ndarray, 
 					 sp : Dict) -> Tuple[np.ndarray, float]:
     """
@@ -28,8 +26,6 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
     l, r : ndarray 
         The left and right test vectors. Cannot have any components in the direction of 
         the current tangent. Must also be normalized.
-    M : int
-        The dimension of the state vector `u`.
     w_prev : ndarray
         Solution to the Jacobian system in the previous point on the branch. Used as initial guess.
     sp : Dict
