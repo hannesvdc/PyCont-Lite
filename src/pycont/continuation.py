@@ -87,7 +87,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
-    rdiff = sp.setdefault("rdiff", 1e-5)
+    rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)
@@ -95,6 +95,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     mode = sp.setdefault("initial_directions", "both").lower()
     param_min = sp.setdefault("param_min", None)
     param_max = sp.setdefault("param_max", None)
+    sp.setdefault("seed", 12345)
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')
@@ -197,8 +198,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     if sp["analyze_stability"]:
         print("Analyzing stability by computing the right-most eigenvalue...", end='\t')
         index = len(branch.p_path) // 2
-        rightmost_eigenvalue = stability.rightmost_eig(G, branch.u_path[index,:], branch.p_path[index], sp)
-        branch.stable = (rightmost_eigenvalue < 0.0)
+        rightmost_eigenvalue_realpart = stability.rightmost_eig_realpart(G, branch.u_path[index,:], branch.p_path[index], sp)
+        branch.stable = (rightmost_eigenvalue_realpart < 0.0)
         print('Stable' if branch.stable else 'Unstable', end='.\n')
 
     # If there are no bifurcation or fold points on this path, return

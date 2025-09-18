@@ -29,10 +29,10 @@ def _makeJacobianOperator(G : Callable[[np.ndarray, float], np.ndarray],
     G_value = G(u, p)
     return lambda v: (G(u + rdiff * v, p) - G_value) / rdiff
 
-def rightmost_eig(G : Callable[[np.ndarray, float], np.ndarray],
-                  u : np.ndarray,
-                  p : float,
-                  sp : Dict) -> float:
+def rightmost_eig_realpart(G : Callable[[np.ndarray, float], np.ndarray],
+                           u : np.ndarray,
+                           p : float,
+                           sp : Dict) -> float:
     """
     Calcualte the right-most eigenvalue of the Jacobian of G at (u, p). Only returns
     the real part.
