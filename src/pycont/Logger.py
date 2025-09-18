@@ -53,7 +53,7 @@ def coerce_verbosity(v) -> Verbosity:
         raise ValueError(f"Bad verbosity {v!r}") from e
     
 LOG = Logger()
-def configure(*, verbosity: Union[Verbosity, str, int] = Verbosity.INFO, stream: TextIO | None = None) -> None:
+def configureLOG(*, verbosity: Union[Verbosity, str, int] = Verbosity.INFO, stream: TextIO | None = None) -> None:
     LOG.set(coerce_verbosity(verbosity))
     if stream is not None:
         LOG.set_stream(stream)

@@ -7,8 +7,9 @@ from . import BranchSwitching as brs
 from . import Stability as stability
 from .Types import ContinuationResult, Event
 from .Tangent import computeTangent
+from .Logger import LOG, Verbosity, configureLOG
 
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, Union
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,
@@ -17,7 +18,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                                 ds_max : float, 
                                 ds_0 : float, 
                                 n_steps : int, 
-                                solver_parameters : Optional[Dict] = None) -> ContinuationResult:
+                                solver_parameters : Optional[Dict] = None,
+                                verbosity: Verbosity | str | int = Verbosity.INFO,) -> ContinuationResult:
     """
     Perform pseudo-arclength continuation for a nonlinear system G(u, p) = 0.
 
@@ -66,6 +68,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         - "param_max" : float (default None)
             User-speficied maximal allowed parameter value. Continuation will not go higher than this limit.
 
+    verbosity : Verbosity or String or Int
+        The level of verbosity required by the user. Can either be Verbosity.QUIET (1), Verbosity.INFO (2) or Verbosity.VERBOSE (3).
+        Any string representation of these words will also be accepted.
+
     Returns
     -------
     ContinuationResult
@@ -97,8 +103,11 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
 
+    # Create the logger based on the user's verbosity requirement.
+    configureLOG(verbosity=verbosity)
+
     # Compute the initial tangent to the curve using the secant method
-    print('\nComputing Initial Tangent to the Branch.')
+    LOG.info('\nComputing Initial Tangent to the Branch.')
     M = len(u0)
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
@@ -114,8 +123,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     elif mode == "decrease_p":
         dirs = [tangent if tangent[M] < 0 else -tangent]
     else:
-        print(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
-        dirs = []
+        raise ValueError(f"Initial Directions must be 'both', 'increase_p' or 'decrease_p'(got {mode})")
 
     # Filter the initial directions based on param_min / param_max if they are set
     valid_dirs = []
@@ -185,7 +193,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     Nothing, but `result` is updated with the new branche(s) and possible bifurcation points.
     """
     branch_id = len(result.branches)
-    print('\n\nContinuation on Branch', branch_id + 1)
+    LOG.info(f'\n\nContinuation on Branch {branch_id + 1}')
     
     # Do regular continuation on this branch
     branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, sp)
@@ -196,11 +204,11 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Calculate the eigenvalues with largest real part to analyze stability of the branch
     if sp["analyze_stability"]:
-        print("Analyzing stability by computing the right-most eigenvalue...", end='\t')
+        LOG.info("Analyzing stability by computing the right-most eigenvalue...")
         index = len(branch.p_path) // 2
         rightmost_eigenvalue_realpart = stability.rightmost_eig_realpart(G, branch.u_path[index,:], branch.p_path[index], sp)
         branch.stable = (rightmost_eigenvalue_realpart < 0.0)
-        print('Stable' if branch.stable else 'Unstable', end='.\n')
+        LOG.info('Stable' if branch.stable else 'Unstable')
 
     # If there are no bifurcation or fold points on this path, return
     if termination_event.kind != "LP" and termination_event.kind != "BP":
@@ -224,7 +232,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
             comparison_point = np.append(result.events[n].u, result.events[n].p)
             if lg.norm(x_singular - comparison_point) / len(x_singular) < 1.e-4:
-                print('Bifurcation point already discovered. Ending continuation along this branch.')
+                LOG.info('Bifurcation point already discovered. Ending continuation along this branch.')
                 return
         
         # The bifurcation point is unique, do branch switching

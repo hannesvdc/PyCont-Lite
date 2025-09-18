@@ -3,6 +3,8 @@ import numpy.linalg as lg
 import scipy.sparse.linalg as slg
 import scipy.optimize as opt
 
+from .Logger import LOG
+
 from typing import Callable, Dict, Tuple
 
 def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
@@ -29,11 +31,14 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 	# Solve the linear system and do postprocessing
     tangent, info = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10))
     tangent_residual = lg.norm(sys(tangent) - rhs)
+    LOG.verbose(f'Tangent LGMRES Residual {tangent_residual}')
     if tangent_residual > 0.01:
         # Solve the linear system using Newton-Krylov with much better lgmres arguments
         def F(v):
             return matvec(v) - rhs
         tangent = opt.newton_krylov(F, prev_tangent, rdiff=rdiff, verbose=False)
+        tangent_residual = lg.norm(F(tangent))
+        LOG.verbose(f'Tangent Newton-Krylov Residual {tangent_residual}')
 
     # Make sure the new tangent lies in the direction of the previous one and return
     tangent = np.sign(np.dot(tangent, prev_tangent)) * tangent / lg.norm(tangent)
