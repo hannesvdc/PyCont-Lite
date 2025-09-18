@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2025-09-18
 
 ### Added
 - **Trying tangent computation using Newton-Schur method** but L-GMRES still takes 10 iterations
@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Arclength information in Branches and Events** for better plotting and debugging.
 - **BrentQ-based optimizer** for fold and bifurcation point localization.
 - **Newton-Krylov corrector** for LGMRES in tangent computation, test function evaluation and bifurcation point detection algorithms.
-- **Logger class** that handles the degrees of logging. Options are 'off', 'info' (default), and 'verbose'. Instance shared by all modules.
+- **Logger class** that handles the degrees of verbosity. Options are 'off', 'info' (default), and 'verbose'. Instance shared by all modules.
+- **User input checks** that raises InputErrors when initial values and parameters don't make sense or contains NaNs / Infs.
 
 ### Moved
 - **Test function and BP Localizer** to new Bifurcation.py
