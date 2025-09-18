@@ -4,7 +4,7 @@ import numpy.random as rd
 import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
-from .Bifurcation import computeBifurcationPoint, test_fn_jacobian
+from .Bifurcation import computeBifurcationPoint, test_fn_jacobian, test_fn_bordered
 
 from .Types import Branch, Event
 
@@ -161,6 +161,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		# Do bifurcation detection in the new point
 		if bifurcation_detection and n % 5 == 0:
 			bf_w_vector, bf_w_value = test_fn_jacobian(F, x_new, l, r, prev_bf_w_vector, sp)
+			#bf_w_vector, bf_w_value = test_fn_bordered(F, x_new, l, r, prev_bf_w_vector, M, sp)
 
 			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 1000.0 or np.abs(prev_bf_w_value) < 1000.0): # Possible bifurcation point detected
 				print('Sign change detected', prev_bf_w_value, bf_w_value)

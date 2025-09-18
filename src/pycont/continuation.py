@@ -197,8 +197,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     if sp["analyze_stability"]:
         print("Analyzing stability by computing the right-most eigenvalue...", end='\t')
         index = len(branch.p_path) // 2
-        rightmost_eigenvalue = stability.rightmost_eig(G, branch.u_path[index,:], branch.p_path[index], sp)
-        branch.stable = (rightmost_eigenvalue < 0.0)
+        rightmost_eigenvalue_realpart = stability.rightmost_eig_realpart(G, branch.u_path[index,:], branch.p_path[index], sp)
+        branch.stable = (rightmost_eigenvalue_realpart < 0.0)
         print('Stable' if branch.stable else 'Unstable', end='.\n')
 
     # If there are no bifurcation or fold points on this path, return
