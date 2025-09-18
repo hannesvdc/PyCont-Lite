@@ -45,6 +45,7 @@ def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 
 	return y, residual
 
+@DeprecationWarning
 def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
 						l : np.ndarray, 
