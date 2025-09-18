@@ -87,7 +87,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
-    rdiff = sp.setdefault("rdiff", 1e-5)
+    rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
     sp.setdefault("bifurcation_detection", True)

@@ -127,10 +127,12 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		
 		# Check that the new point does not exceed param_min or param_max, if supplied
 		if param_min is not None and x_new[M] < param_min:
+			print('Stopping Continuation Along this Branch. PARAM_MIN', param_min, 'reached.')
 			termination_event = Event("PARAM_MIN", x_new[0:M], x_new[M], new_s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
 		if param_max is not None and x_new[M] > param_max:
+			print('Stopping Continuation Along this Branch. PARAM_MAX', param_max, 'reached.')
 			termination_event = Event("PARAM_MAX", x_new[0:M], x_new[M], new_s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
@@ -160,7 +162,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		if bifurcation_detection and n % 5 == 0:
 			bf_w_vector, bf_w_value = test_fn_jacobian(F, x_new, l, r, M, prev_bf_w_vector, sp)
 
-			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 5000.0 or np.abs(prev_bf_w_value) < 5000.0): # Possible bifurcation point detected
+			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 1000.0 or np.abs(prev_bf_w_value) < 1000.0): # Possible bifurcation point detected
 				print('Sign change detected', prev_bf_w_value, bf_w_value)
 
 				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, x, x_new, l, r, bf_w_vector, M, sp)

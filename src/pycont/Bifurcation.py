@@ -43,23 +43,16 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
             The value of the test function. Monitor this for sign changes.
     """
     rdiff = sp["rdiff"]
-    maxiter = M if M < 10 else 10
     def matvec(w):
         norm_w = np.linalg.norm(w)
         if norm_w == 0.0:
-            return 0.0 * w
+            return -r
         eps = rdiff / norm_w
-        return (F(x + eps * w) - F(x - eps * w)) / (2.0*eps) # Exactly linear central differences
-    sys = slg.LinearOperator((M+1, M+1), matvec)
-      
-    # Solve the linear system using L-GMRES. If the residual is too large, refine with Newton-Krylov.
+        return (F(x + eps * w) - F(x - eps * w)) / (2.0*eps) - r
+
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-        w_solution, _ = slg.lgmres(sys, r, x0=w_prev, maxiter=maxiter)
-    residual = float(np.linalg.norm(matvec(w_solution) - r))
-    if residual > 0.01:
-        F_NK = lambda w: matvec(w) - r
-        w_solution = opt.newton_krylov(F_NK, w_solution, rdiff=rdiff, verbose=False)
-        residual = np.linalg.norm(F_NK(w_solution))
+        w_solution = opt.newton_krylov(matvec, w_prev, rdiff=rdiff, verbose=False)
+    residual = np.linalg.norm(matvec(w_solution))
     beta = -1.0 / np.dot(l, w_solution)
     print('Test FN', beta, residual)
 
@@ -122,7 +115,8 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
             return np.append(J_eq, [l_eq]) - rhs
 
         # Solve the linear system to obtain beta = z_solution[-1]
-        z_solution = opt.newton_krylov(bordered_matvec, z0, rdiff=rdiff)
+        with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+            z_solution = opt.newton_krylov(bordered_matvec, z0, rdiff=rdiff)
         print('Linear residual', np.linalg.norm(bordered_matvec(z_solution)))
         beta = z_solution[M+1]
 
