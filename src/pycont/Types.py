@@ -48,3 +48,10 @@ class Branch:
 class ContinuationResult:
     branches: List[Branch] = field(default_factory=list)
     events: List[Event] = field(default_factory=list)
+
+class PyContError(Exception):
+    """Base exception for PyCont-Lite."""
+
+class InputError(PyContError, ValueError):
+    """Invalid user input or options."""
+    pass

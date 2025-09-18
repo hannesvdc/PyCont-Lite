@@ -45,6 +45,7 @@ def solve_bordered_system_krylov(matvec : Callable[[np.ndarray], np.ndarray],
 
 	return y, residual
 
+@DeprecationWarning
 def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray], 
 						x : np.ndarray,
 						l : np.ndarray, 
@@ -104,6 +105,5 @@ def test_fn_bifurcation(F : Callable[[np.ndarray], np.ndarray],
 	
 	matvec = make_bordered_jacobian_system(F, x, l, r, sp["rdiff"], eps_reg)
 	y, residual = solve_bordered_system_krylov(matvec, M, y_prev)
-	print('Test FN', y[M+1], residual)
 
 	return y, y[M+1], residual

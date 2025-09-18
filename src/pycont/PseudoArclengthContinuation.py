@@ -7,6 +7,7 @@ from .Tangent import computeTangent, computeFoldPoint
 from .Bifurcation import computeBifurcationPoint, test_fn_jacobian, test_fn_bordered
 
 from .Types import Branch, Event
+from .Logger import LOG
 
 from typing import Callable, Tuple, Dict, Any
 
@@ -78,7 +79,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	tangent = initial_tangent / lg.norm(initial_tangent)
 	branch = Branch(branch_id, n_steps, u0, p0)
 	print_str = f"Step n: {0:3d}\t u: {lg.norm(u0):.4f}\t p: {p0:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
-	print(print_str)
+	LOG.info(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
 	rng = rd.RandomState(seed=sp["seed"])
@@ -120,19 +121,19 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		else:
 			# This case should never happpen under normal circumstances
-			print('Minimal Arclength Size is too large. Aborting.')
+			LOG.info('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
 		
 		# Check that the new point does not exceed param_min or param_max, if supplied
 		if param_min is not None and x_new[M] < param_min:
-			print('Stopping Continuation Along this Branch. PARAM_MIN', param_min, 'reached.')
+			LOG.info(f'Stopping Continuation Along this Branch. PARAM_MIN {param_min} reached.')
 			termination_event = Event("PARAM_MIN", x_new[0:M], x_new[M], new_s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
 		if param_max is not None and x_new[M] > param_max:
-			print('Stopping Continuation Along this Branch. PARAM_MAX', param_max, 'reached.')
+			LOG.info(f'Stopping Continuation Along this Branch. PARAM_MAX {param_max} reached.')
 			termination_event = Event("PARAM_MAX", x_new[0:M], x_new[M], new_s)
 			branch.termination_event = termination_event
 			return branch.trim(), termination_event
@@ -144,9 +145,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		if new_tangent[M] * tangent[M] < 0.0 and n > 5:
 			is_fold_point, x_fold, alpha_fold = computeFoldPoint(G, x, x_new, new_tangent, ds, sp)
 			if not is_fold_point:
-				print('Erroneous Fold Point detection due to blow-up in tangent vector.')
+				LOG.info('Erroneous Fold Point detection due to blow-up in tangent vector.')
 			else:
-				print('Fold point at', x_fold)
+				LOG.info(f'Fold point at {x_fold}')
 
 				# Append the fold point and x_new to the current path
 				s_fold = s + alpha_fold * (new_s - s)
@@ -164,18 +165,18 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			#bf_w_vector, bf_w_value = test_fn_bordered(F, x_new, l, r, prev_bf_w_vector, M, sp)
 
 			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 1000.0 or np.abs(prev_bf_w_value) < 1000.0): # Possible bifurcation point detected
-				print('Sign change detected', prev_bf_w_value, bf_w_value)
+				LOG.info(f'Sign change detected {prev_bf_w_value} {bf_w_value}')
 
 				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, x, x_new, l, r, bf_w_vector, M, sp)
 				if is_bf_point:
-					print('Bifurcation Point at', x_singular)
+					LOG.info(f'Bifurcation Point at {x_singular}')
 					s_singular = s + alpha_singular * (new_s - s)
 					branch.addPoint(x_singular[0:M], x_singular[M], s_singular)
 					termination_event = Event("BP", x_singular[0:M], x_singular[M], s_singular)
 					branch.termination_event = termination_event
 					return branch.trim(), termination_event
 				else:
-					print('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
+					LOG.info('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
 				
 			prev_bf_w_value = bf_w_value
 			prev_bf_w_vector = bf_w_vector
@@ -188,7 +189,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		
 		# Print the status
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
-		print(print_str)
+		LOG.info(print_str)
 
 	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
 	branch.termination_event = termination_event

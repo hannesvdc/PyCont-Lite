@@ -2,6 +2,8 @@ import numpy as np
 import scipy.linalg as lg
 import scipy.optimize as opt
 
+from .Logger import LOG
+
 from typing import Callable, List, Tuple, Dict
 
 def _find_all_zeros(f : Callable[[np.ndarray], float]) -> List[np.ndarray]:
@@ -178,7 +180,7 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
     tangents : List[ndarray]
         Tangent vectors at the new branches in the starting points.
     """
-    print('\nBranch Switching')
+    LOG.info('\nBranch Switching')
 
     # Setting up variables
     M = x_singular.size - 1
@@ -227,7 +229,7 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
             idx = n
     directions.pop(idx)
     tangents.pop(idx)
-    print('Branch Switching Tangents:', tangents)
+    LOG.info(f'Branch Switching Tangents: {tangents}')
 
     # Returning 3 continuation directions
     return directions, tangents
