@@ -95,6 +95,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     mode = sp.setdefault("initial_directions", "both").lower()
     param_min = sp.setdefault("param_min", None)
     param_max = sp.setdefault("param_max", None)
+    sp.setdefault("seed", 12345)
 
     # Compute the initial tangent to the curve using the secant method
     print('\nComputing Initial Tangent to the Branch.')

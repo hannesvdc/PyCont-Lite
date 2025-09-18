@@ -81,7 +81,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	print(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
-	rng = rd.RandomState()
+	rng = rd.RandomState(seed=sp["seed"])
 	r = rng.normal(0.0, 1.0, M+1); r = r / lg.norm(r)
 	l = rng.normal(0.0, 1.0, M+1); l = l / lg.norm(l)
 	r = r - np.dot(r, tangent) * tangent; r = r / lg.norm(r)
