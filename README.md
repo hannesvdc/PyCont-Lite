@@ -179,14 +179,14 @@ ds_min = 1e-6
 ds0 = 1e-4
 n_steps = 1000
 solver_parameters = {"tolerance" : tolerance, "param_min" : 0.22, "param_max" : 0.7}
-continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='off')
+continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='verbose')
 
 # Plot the bifurcation diagram eps versus phi(x=-1)
 u_transform = lambda phi: phi[0]
 pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform, p_label=r'$\varepsilon$', u_label=r'$\phi(x=-1)$')
 ```
 
-This produces the classical S-shaped bifurcation curve with a fold near $\lambda \approx 3.51$.
+This reproduces the many bifurcation points as $\varepsilon \to 0$.
 
 <p align="center">
     <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/AllenCahn.png" width="400">
@@ -227,6 +227,29 @@ solver_parameters = {
 }
 ```
 
+## Verbosity Options
+Control how much progress info PyCont-Lite prints during continuation. Three levels are supported:
+
+| Level   | What you see |
+|--------|---------------|
+| `off`  | No progress messages (errors only). |
+| `info` | One-line progress per step + event summaries (recommended default). |
+| `verbose` | Solver details: Newton–Krylov iterations, step rejections, preconditioner notes. |
+
+Pass the level to `arclengthContinuation` via the `verbosity` argument. You can use a **string** (case-insensitive) or the **enum**:
+
+```python
+from pycont import arclengthContinuation, Verbosity
+
+# String (case-insensitive)
+arclengthContinuation(G, u0, p0, ..., verbosity="info")
+
+# Enum
+arclengthContinuation(G, u0, p0, ..., verbosity=Verbosity.VERBOSE)
+```
+Default is `info`. See the Allen–Cahn example above for a typical verbose run.
+
+
 ## Output Format
 
 ```arclengthContinuation``` returns a **ContinuationResult** object with:
@@ -239,7 +262,7 @@ This makes it easy to explore and plot bifurcation diagrams programmatically.
 The following features are under active consideration for future releases:
 - Hopf bifurcation detection
 - Limit cycle continuation
-- Improved tangent computation for high-dimensional PDE systems
+- More stable bifurcation detection by employing two independent (but fast) tests
 
 ## License
 
