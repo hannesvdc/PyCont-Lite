@@ -140,6 +140,58 @@ This produces the classical S-shaped bifurcation curve with a fold near $\lambda
     <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/Bratu.png" width="400">
 </p>
 
+### Allen-Cahn
+
+The nonlinear boundary value problem
+
+$$
+\varepsilon \phi_{xx} - \varepsilon^{-1} \phi \left(\phi^2 - 1\right) = 0, \quad \phi_x(-1) = \phi_x(1)=0
+$$
+
+discretized with finite differences:
+
+```python
+import numpy as np
+import pycont
+
+N = 100
+x = np.linspace(-1.0, 1.0, N)
+dx = (x[-1] - x[0]) / (N-1)
+
+def laplace_neumann(phi, dx):
+    phi_ext = np.hstack([phi[1], phi, phi[-2]])
+    phi_l = np.roll(phi_ext, -1)[1:-1]
+    phi_r = np.roll(phi_ext,  1)[1:-1]
+    return (phi_l - 2.0*phi + phi_r) / dx**2
+def G(phi : np.ndarray, eps : float):
+    phi_xx = laplace_neumann(phi, dx)
+    rhs = eps * phi_xx - phi * (phi**2 - 1.0) / eps
+    return rhs
+
+# Initial Point
+eps0 = 0.6
+phi0 = np.zeros(N)
+
+# Do continuation
+tolerance = 1e-9
+ds_max = 1e-2
+ds_min = 1e-6
+ds0 = 1e-4
+n_steps = 1000
+solver_parameters = {"tolerance" : tolerance, "param_min" : 0.22, "param_max" : 0.7}
+continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='off')
+
+# Plot the bifurcation diagram eps versus phi(x=-1)
+u_transform = lambda phi: phi[0]
+pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform, p_label=r'$\varepsilon$', u_label=r'$\phi(x=-1)$')
+```
+
+This produces the classical S-shaped bifurcation curve with a fold near $\lambda \approx 3.51$.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/AllenCahn.png" width="400">
+</p>
+
 ## Plotting Bifurcation Diagrams
 
 PyCont-Lite includes a helper function `plotBifurcationDiagram` for quick visualization. Stable segments are shown as solid lines and unstable segments as dashed lines, just like in AUTO/MATCONT.
