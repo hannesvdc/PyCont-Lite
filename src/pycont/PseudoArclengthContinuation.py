@@ -4,12 +4,37 @@ import numpy.random as rd
 import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
-from .Bifurcation import computeBifurcationPoint, test_fn_jacobian, test_fn_bordered
+from .Bifurcation import computeBifurcationPoint, test_fn_jacobian, test_fn_bordered, test_fn_jacobian_multi
 
 from .Types import Branch, Event
 from .Logger import LOG
 
 from typing import Callable, Tuple, Dict, Any
+
+def _orthonormalize_lr(l_vectors : np.ndarray, 
+					   r_vectors : np.ndarray, 
+					   tangent : np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+	"""
+    Orthonormalize the rows of l_vectors and r_vectors (shape (k, M+1) each).
+    Additionally, make each row of l_vectors orthogonal to the given tangent (length M+1).
+
+	Parameters
+	----------
+	l_vectors, r_vectors: ndarray
+	tangent : ndarray
+		The current tangent vector.
+
+    Returns
+    -------
+    L_orth, R_orth : nparray
+        Row-orthonormal matrices. L_orth rows are also orthogonal to 'tangent'.
+    """
+	extended_r_vectors = r_vectors.T
+	extended_l_vectors = np.concatenate((tangent[:,np.newaxis], l_vectors.T), axis=1)
+	extended_r_vectors, _ = np.linalg.qr(extended_r_vectors, mode='reduced')
+	extended_l_vectors, _ = np.linalg.qr(extended_l_vectors, mode='reduced')
+
+	return extended_l_vectors[:,1:].T, extended_r_vectors.T
 
 def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
                  u0 : np.ndarray, 
@@ -72,6 +97,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	param_min = sp["param_min"]
 	param_max = sp["param_max"]
 	nk_tolerance = max(a_tol, r_diff)
+	n_bifurcation_vectors = sp["n_bifurcation_vectors"]
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
@@ -82,13 +108,13 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	LOG.info(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
-	rng = rd.RandomState(seed=sp["seed"])
-	r = rng.normal(0.0, 1.0, M+1); r = r / lg.norm(r)
-	l = rng.normal(0.0, 1.0, M+1); l = l / lg.norm(l)
-	r = r - np.dot(r, tangent) * tangent; r = r / lg.norm(r)
-	l = l - np.dot(l, tangent) * tangent; l = l / lg.norm(l)
-	prev_bf_w_vector = np.zeros(M+1)
-	prev_bf_w_value = 0.0
+	rng = rd.RandomState()#seed=sp["seed"])
+	r_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
+	l_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
+	l_vectors, r_vectors = _orthonormalize_lr(l_vectors, r_vectors, tangent)
+	prev_w_vectors = np.zeros_like(r_vectors)
+	prev_w_values = np.zeros(n_bifurcation_vectors)
+	prev_bf_x = np.copy(x)
 
 	for n in range(1, n_steps+1):
 
@@ -109,9 +135,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					x_new = opt.newton_krylov(F, x_p, f_tol=a_tol, rdiff=r_diff, maxiter=max_it, verbose=False)
 				except opt.NoConvergence as e:
 					x_new = e.args[0]
+			nk_residual = lg.norm(F(x_new))
 			
 			# Check the residual to increase or decrease ds
-			nk_residual = lg.norm(F(x_new))
 			good_residual = np.all(np.isfinite(nk_residual))
 			if good_residual and nk_residual <= 10.0 * nk_tolerance:
 				ds = min(1.2*ds, ds_max)
@@ -161,13 +187,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Do bifurcation detection in the new point
 		if bifurcation_detection and n % 5 == 0:
-			bf_w_vector, bf_w_value = test_fn_jacobian(F, x_new, l, r, prev_bf_w_vector, sp)
-			#bf_w_vector, bf_w_value = test_fn_bordered(F, x_new, l, r, prev_bf_w_vector, M, sp)
+			w_vectors, w_values = test_fn_jacobian_multi(F, x_new, l_vectors, r_vectors, prev_w_vectors, sp)
 
-			if prev_bf_w_value * bf_w_value < 0.0 and (np.abs(bf_w_value) < 1000.0 or np.abs(prev_bf_w_value) < 1000.0): # Possible bifurcation point detected
-				LOG.info(f'Sign change detected {prev_bf_w_value} {bf_w_value}')
+			# Possible bifurcation point detected
+			bf_condition = (prev_w_values * w_values < 0.0) & (np.abs(w_values) < 1000.0) & (np.abs(prev_w_values) < 1000.0)
+			if np.any(bf_condition):
+				index = np.where(bf_condition)[0].min()
+				LOG.info(f'Sign change detected {prev_w_values} {w_values} {index}')
 
-				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, x, x_new, l, r, bf_w_vector, M, sp)
+				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, prev_bf_x, x_new, l_vectors[index], r_vectors[index], w_vectors[index], M, sp)
 				if is_bf_point:
 					LOG.info(f'Bifurcation Point at {x_singular}')
 					s_singular = s + alpha_singular * (new_s - s)
@@ -177,9 +205,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					return branch.trim(), termination_event
 				else:
 					LOG.info('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
-				
-			prev_bf_w_value = bf_w_value
-			prev_bf_w_vector = bf_w_vector
+			
+			prev_w_vectors = w_vectors
+			prev_w_values = w_values
+			prev_bf_x = np.copy(x_new)
 
 		# Bookkeeping for the next step
 		tangent = np.copy(new_tangent)

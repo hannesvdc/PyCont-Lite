@@ -13,7 +13,7 @@ def TransCriticalTest():
 	u0 = np.array([-5.0])
 	p0 = -5.0
 	solver_parameters = {"tolerance": 1e-10}
-	continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+	continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='verbose')
 
 	# Print some Internal info
 	print('\nNumber of Branches:', len(continuation_result.branches))

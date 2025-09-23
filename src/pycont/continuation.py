@@ -112,6 +112,9 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
       or bifurcations.
     - Ensure u0 is a converged solution of G(u, p0)=0 for best reliability.
     """
+    u0 = _as_1d_float(u0, "u0")
+    p0 = _as_scalar_float(p0, "p0")
+    M = len(u0)
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
@@ -124,13 +127,12 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_min = sp.setdefault("param_min", None)
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
+    n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
 
     # Create the logger based on the user's verbosity requirement.
     configureLOG(verbosity=verbosity)
 
     # Perform necessary chechs on the user's input
-    u0 = _as_1d_float(u0, "u0")
-    p0 = _as_scalar_float(p0, "p0")
     G0 = G(u0, p0)
     if not np.all(np.isfinite(G0)):
         raise InputError(f"Initial function evaluation contains NaN or Inf {G0}.")
@@ -153,6 +155,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"nk_maxiter must be strictly positive. Got {nk_maxiter}.")
     if tolerance <= 0.0:
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
+    if n_bifurcation_vectors < 0:
+        raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')

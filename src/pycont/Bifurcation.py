@@ -56,6 +56,21 @@ def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray],
 
     return w_solution, beta
 
+def test_fn_jacobian_multi(F : Callable[[np.ndarray], np.ndarray], 
+					       x : np.ndarray,
+					       l_vectors : np.ndarray, 
+					       r_vectors : np.ndarray, 
+					       w_prev : np.ndarray, 
+					       sp : Dict) -> Tuple[np.ndarray, np.ndarray]:
+    w_vectors = np.zeros_like(w_prev)
+    w_values = np.zeros(w_prev.shape[0])
+    for index in range(r_vectors.shape[0]):
+        w_i, value_i = test_fn_jacobian(F, x, l_vectors[index], r_vectors[index], w_prev[index], sp)
+        w_vectors[index,:] = w_i
+        w_values[index] = value_i
+    
+    return w_vectors, w_values
+
 def test_fn_bordered(F : Callable[[np.ndarray], np.ndarray], 
 					 x : np.ndarray,
 					 l : np.ndarray, 
@@ -183,11 +198,13 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     
     # Solve beta = 0. This is the location of the bifurcation point.
     try:
-        LOG.verbose(f'BrentQ edge values {BFObjective(-5.0)},  {BFObjective(5.0)}')
-        alpha_singular, result = opt.brentq(BFObjective, -5.0, 5.0, full_output=True, disp=False)
+        LOG.verbose(f'BrentQ edge values {BFObjective(0.0)},  {BFObjective(1.0)}')
+        alpha_singular, result = opt.brentq(BFObjective, 0.0, 1.0, full_output=True, disp=False)
     except ValueError: # No sign change detected
+        LOG.verbose('Value error caught')
         return False, x_end, 1.0
     except opt.NoConvergence:
+        LOG.verbose('NoConvergence error caught')
         return False, x_end, 1.0
     x_singular = x_start + alpha_singular * x_diff
 
