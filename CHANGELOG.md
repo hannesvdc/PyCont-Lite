@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- **Orthonormalizing** l- and r- vectors for bifurcation detection. Also projecting all l-vectors off the initial tangent.
+- **Multiple Bifurcation Test vectors** for more robust bifurcation detection.
+
+### Removed
+- **testfunctions.py** the bordered test for bifurcation points is already included in Bifurcation.py
+
 ## [0.3.1] - 2025-09-19
 
 ### Added
