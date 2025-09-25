@@ -4,7 +4,7 @@ import numpy.random as rd
 import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
-from .Bifurcation import computeBifurcationPoint, test_fn_jacobian, test_fn_bordered, test_fn_jacobian_multi
+from .Bifurcation import computeBifurcationPoint, test_fn_jacobian_multi
 
 from .Types import Branch, Event
 from .Logger import LOG
@@ -178,7 +178,6 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				# Append the fold point and x_new to the current path
 				s_fold = s + alpha_fold * (new_s - s)
 				branch.addPoint(x_fold[0:M], x_fold[M], s_fold)
-				branch.addPoint(x_new[0:M], x_new[M], new_s)
 				
 				# Stop continuation along this branch
 				termination_event = Event("LP", x_fold[0:M], x_fold[M], s_fold, {"tangent": new_tangent})

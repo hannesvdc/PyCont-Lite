@@ -117,7 +117,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     M = len(u0)
     
     # Verify and set default the solver parameters
-    sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
+    sp = {} if solver_parameters is None else dict(solver_parameters)
     rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
@@ -128,6 +128,13 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
     n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
+    sp.setdefault("hopf_detection", False)
+    r_keep = sp.setdefault("r_keep", 2)
+    m_target = sp.setdefault("m_target", 16)
+
+    # Perform basic checks on some parameters without raising an error
+    sp["r_keep"] = min(M, r_keep)
+    sp["m_target"] = min(m_target, M)
 
     # Create the logger based on the user's verbosity requirement.
     configureLOG(verbosity=verbosity)
@@ -157,10 +164,11 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     if n_bifurcation_vectors < 0:
         raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
+    if m_target > r_keep:
+        raise InputError(f"r_keep cannot be larger than m_target for Hopf bifurcation detection, got {r_keep} and {m_target}.")
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
-    M = len(u0)
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         try:
             u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
