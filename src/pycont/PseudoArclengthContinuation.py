@@ -5,6 +5,7 @@ import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
 from .Bifurcation import computeBifurcationPoint, test_fn_jacobian_multi
+from .Hopf import initializeHopf, refreshHopf
 
 from .Types import Branch, Event
 from .Logger import LOG
@@ -35,6 +36,15 @@ def _orthonormalize_lr(l_vectors : np.ndarray,
 	extended_l_vectors, _ = np.linalg.qr(extended_l_vectors, mode='reduced')
 
 	return extended_l_vectors[:,1:].T, extended_r_vectors.T
+
+def _makeExtendedSystem(G : Callable[[np.ndarray, float], np.ndarray],
+						tangent : np.ndarray,
+						x : np.ndarray, 
+						ds : float,
+						M : int) -> Callable[[np.ndarray], np.ndarray]:
+	N = lambda q: np.dot(tangent, q - x) - ds
+	F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+	return F
 
 def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
                  u0 : np.ndarray, 
@@ -98,6 +108,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	param_max = sp["param_max"]
 	nk_tolerance = max(a_tol, r_diff)
 	n_bifurcation_vectors = sp["n_bifurcation_vectors"]
+	hopf_detection = sp["hopf_detection"]
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
@@ -108,19 +119,25 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	LOG.info(print_str)
 
 	# Variables for test_fn bifurcation detection - Ensure no component in the direction of the tangent
-	rng = rd.RandomState()#seed=sp["seed"])
-	r_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
-	l_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
-	l_vectors, r_vectors = _orthonormalize_lr(l_vectors, r_vectors, tangent)
-	prev_w_vectors = np.zeros_like(r_vectors)
-	prev_w_values = np.zeros(n_bifurcation_vectors)
-	prev_bf_x = np.copy(x)
+	if bifurcation_detection:
+		rng = rd.RandomState()#seed=sp["seed"])
+		r_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
+		l_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
+		l_vectors, r_vectors = _orthonormalize_lr(l_vectors, r_vectors, tangent)
+		prev_w_vectors = np.zeros_like(r_vectors)
+		prev_w_values = np.zeros(n_bifurcation_vectors)
+		prev_bf_x = np.copy(x)
+
+	# Initialize Hopf detector if activated
+	if hopf_detection:
+		F = _makeExtendedSystem(G, tangent, x, ds, M)
+		prev_hopf_state = initializeHopf(F, x, sp["m_target"], sp)
 
 	for n in range(1, n_steps+1):
-
+		F = _makeExtendedSystem(G, tangent, x, ds, M)
 		# Create the extended system for corrector
-		N = lambda q: np.dot(tangent, q - x) - ds
-		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		#N = lambda q: np.dot(tangent, q - x) - ds
+		#F = lambda q: np.append(G(q[0:M], q[M]), N(q))
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
@@ -208,6 +225,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			prev_w_vectors = w_vectors
 			prev_w_values = w_values
 			prev_bf_x = np.copy(x_new)
+
+		if hopf_detection and n % 5 == 0:
+			hopf_state = refreshHopf(F, x_new, prev_hopf_state, sp)
+			prev_hopf_state = hopf_state
 
 		# Bookkeeping for the next step
 		tangent = np.copy(new_tangent)
