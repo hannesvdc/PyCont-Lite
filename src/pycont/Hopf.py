@@ -53,10 +53,11 @@ def arnoldi_from_seed(Jv: Callable[[np.ndarray], np.ndarray],
     H : ndarrray
         Square upper Hessenberg matrix, obtained for free from the Arnoldi method.
     """
+    dtype = V0.dtype
     r_keep = V0.shape[1]
-    V = np.zeros((V0.shape[0], m_target))
+    V = np.zeros((V0.shape[0], m_target), dtype=dtype)
     V[:,:r_keep] = V0
-    H = np.zeros((m_target + 1, m_target))
+    H = np.zeros((m_target + 1, m_target), dtype=dtype)
 
     # Initialize V and H from the seed.
     m = r_keep
@@ -111,8 +112,9 @@ def _pick_near_axis(vals: np.ndarray,
         mask = np.arange(vals.size)
     return mask[np.argsort(np.abs(np.real(vals[mask])))[:min(r, mask.size)]]
 
-def initializeHopf(F: Callable[[np.ndarray], np.ndarray],
-                   x : np.ndarray,
+def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
+                   u : np.ndarray,
+                   p : float,
                    m0: int,
                    sp: Dict) -> Dict:
     """
@@ -124,10 +126,12 @@ def initializeHopf(F: Callable[[np.ndarray], np.ndarray],
 
     Parameters
     ----------
-    F : Callable
-        The extended objective function.
-    x : ndarray
-        The current point on the path.
+    G : Callable
+        The objective function.
+    u : ndarray
+        The current state vector on the path.
+    p : float
+        The current parameter value.
     m0 : int
         The initial number of eigenpairs to compute.
     sp : Dict
@@ -140,27 +144,38 @@ def initializeHopf(F: Callable[[np.ndarray], np.ndarray],
         Ritz values and vectors "ritz_vals" and "ritz_vecs", index "lead" of the eigenvalue 
         closes to the imaginary axis, and "omega" the imaginary part of this eigenvalue.
     """
-    N = x.size
+    M = len(u)
     rdiff = sp["rdiff"]
-    Jv = lambda v: (F(x + rdiff*v) - F(x - rdiff*v)) / (2.0*rdiff)
+    Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
     # Compute the initial seed of many eigenvectors with largest real part (see assumption).
-    k_pool = max(2, min(m0, N - 2))
-    A = slg.LinearOperator((N, N), Jv)
-    vals_full, V = slg.eigs(A, k=k_pool, which="LR", return_eigenvectors=True) # type: ignore[reportAssignmentType]
+    if M > 2:
+        k_pool = min(m0, max(1, M-2))
+        A = slg.LinearOperator((M, M), Jv)
+        vals_full, V = slg.eigs(A, k=k_pool, which="LR", return_eigenvectors=True) # type: ignore[reportAssignmentType]
 
-    # Compute Ritz eigenvalues and vectors (vals and vecs)
-    Q, R = np.linalg.qr(V)  # Q: (n,k), R: (k,k)
-    Rinv = np.linalg.solve(R, np.eye(R.shape[0]))
-    H = R @ np.diag(vals_full) @ Rinv
-    ritz_vals, ritz_vecs = np.linalg.eig(H)
+        # Compute Ritz eigenvalues and vectors (vals and vecs)
+        Q, R = np.linalg.qr(V)  # Q: (n,k), R: (k,k)
+        Rinv = np.linalg.solve(R, np.eye(R.shape[0]))
+        H = R @ np.diag(vals_full) @ Rinv
+        ritz_vals, ritz_vecs = np.linalg.eig(H)
+        state = {"V": Q, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
+    elif M == 2: # edge case M = 2. Compute Ritz values explicitly
+        e1 = np.array([1.0, 0.0])
+        e2 = np.array([0.0, 1.0])
+        J  = np.column_stack((Jv(e1), Jv(e2)))
+
+        V = np.eye(2)             # orthonormal basis spanning R^2
+        H = J                     # H = V^* J V = J
+        ritz_vals, ritz_vecs = np.linalg.eig(H)
+        state = {"V": V, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
 
     # Do one refresh step to maintain a consistent data structure and return.
-    state = {"V": Q, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
-    return refreshHopf(F, x, state, sp)
+    return refreshHopf(G, u, p, state, sp)
 
-def refreshHopf(F: Callable[[np.ndarray], np.ndarray],
-                x: np.ndarray,
+def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
+                u : np.ndarray,
+                p : float,
                 state: Dict,
                 sp: Dict) -> Dict:
     """
@@ -169,10 +184,12 @@ def refreshHopf(F: Callable[[np.ndarray], np.ndarray],
 
     Parameters
     ----------
-    F : Callable
-        The extended objective function.
-    x : ndarray
-        The current point on the path.
+    G : Callable
+        The objective function.
+    u : ndarray
+        The current state vector on the path.
+    p : float
+        The current parameter value.
     state: Dict
         The Hopf eigenstate at a previous point, used as seed for the new Arnoldi method.
     sp : Dict
@@ -186,10 +203,10 @@ def refreshHopf(F: Callable[[np.ndarray], np.ndarray],
         closes to the imaginary axis, and "omega" the imaginary part of this eigenvalue.
     """
     rdiff = sp["rdiff"]
-    keep_r = sp["keep_r"]
+    keep_r = sp["r_keep"]
     m_target = sp["m_target"]
     omega_min = 1e-3
-    Jv = lambda v: (F(x + rdiff*v) - F(x - rdiff*v)) / (2.0*rdiff)
+    Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
     # Pick the Ritz pair closest to the imaginary axis and lift them to the full-dimensional space
     idx = _pick_near_axis(state["ritz_vals"], keep_r, omega_min)
