@@ -112,6 +112,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
       or bifurcations.
     - Ensure u0 is a converged solution of G(u, p0)=0 for best reliability.
     """
+    # Create the logger based on the user's verbosity requirement.
+    configureLOG(verbosity=verbosity)
+
+    # Parse the input state
     u0 = _as_1d_float(u0, "u0")
     p0 = _as_scalar_float(p0, "p0")
     M = len(u0)
@@ -128,16 +132,14 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
     n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-    sp.setdefault("hopf_detection", False)
+    hopf_detection = sp.setdefault("hopf_detection", False)
     r_keep = sp.setdefault("r_keep", 2)
     m_target = sp.setdefault("m_target", 16)
 
     # Perform basic checks on some parameters without raising an error
     sp["r_keep"] = min(M, r_keep)
     sp["m_target"] = min(m_target, M)
-
-    # Create the logger based on the user's verbosity requirement.
-    configureLOG(verbosity=verbosity)
+    LOG.verbose(f'Hopf detector {sp["r_keep"]} and {sp["m_target"]}.')
 
     # Perform necessary chechs on the user's input
     G0 = G(u0, p0)
@@ -164,8 +166,10 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     if n_bifurcation_vectors < 0:
         raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
-    if m_target > r_keep:
+    if r_keep > m_target:
         raise InputError(f"r_keep cannot be larger than m_target for Hopf bifurcation detection, got {r_keep} and {m_target}.")
+    if hopf_detection and M < 2:
+        raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')

@@ -37,15 +37,6 @@ def _orthonormalize_lr(l_vectors : np.ndarray,
 
 	return extended_l_vectors[:,1:].T, extended_r_vectors.T
 
-def _makeExtendedSystem(G : Callable[[np.ndarray, float], np.ndarray],
-						tangent : np.ndarray,
-						x : np.ndarray, 
-						ds : float,
-						M : int) -> Callable[[np.ndarray], np.ndarray]:
-	N = lambda q: np.dot(tangent, q - x) - ds
-	F = lambda q: np.append(G(q[0:M], q[M]), N(q))
-	return F
-
 def continuation(G : Callable[[np.ndarray, float], np.ndarray], 
                  u0 : np.ndarray, 
                  p0 : float, 
@@ -130,14 +121,12 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	# Initialize Hopf detector if activated
 	if hopf_detection:
-		F = _makeExtendedSystem(G, tangent, x, ds, M)
-		prev_hopf_state = initializeHopf(F, x, sp["m_target"], sp)
+		prev_hopf_state = initializeHopf(G, u0, p0, sp["m_target"], sp)
 
 	for n in range(1, n_steps+1):
-		F = _makeExtendedSystem(G, tangent, x, ds, M)
 		# Create the extended system for corrector
-		#N = lambda q: np.dot(tangent, q - x) - ds
-		#F = lambda q: np.append(G(q[0:M], q[M]), N(q))
+		N = lambda q: np.dot(tangent, q - x) - ds
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
 
 		# Our implementation uses adaptive timetepping
 		while ds > ds_min:
@@ -227,7 +216,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			prev_bf_x = np.copy(x_new)
 
 		if hopf_detection and n % 5 == 0:
-			hopf_state = refreshHopf(F, x_new, prev_hopf_state, sp)
+			hopf_state = refreshHopf(G, x_new[0:M], x_new[M], prev_hopf_state, sp)
 			prev_hopf_state = hopf_state
 
 		# Bookkeeping for the next step
