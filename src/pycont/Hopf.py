@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse.linalg as slg
 
+from .Logger import LOG
+
 from typing import Callable, Dict, Tuple
 
 def _orthonormalize(X: np.ndarray) -> np.ndarray:
@@ -22,9 +24,10 @@ def _orthonormalize(X: np.ndarray) -> np.ndarray:
     V = np.zeros_like(X)
     for j in range(X.shape[1]):
         w = X[:, j]
-        for v in V:
-            w -= np.vdot(v, w) * v
-        norm_w = np.linalg.norm(w)
+        for i in range(column_index):
+        #for v in V:
+            w -= np.vdot(V[:,i], w) * V[:,i]
+        norm_w = np.sqrt(np.vdot(w, w))
         if norm_w > 0:
             V[:,column_index] = w / norm_w
             column_index += 1
@@ -71,6 +74,8 @@ def arnoldi_from_seed(Jv: Callable[[np.ndarray], np.ndarray],
         if hj > 0.0 and m < m_target:
             V[:, m] = w / hj
             m += 1
+        else:
+            LOG.verbose(f'Happy breakdown at index {m} because {hj} and {m_target}')
 
     # Start Arnoldi scheme from V - the updated seed.
     while m < m_target:
@@ -171,6 +176,7 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         state = {"V": V, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
 
     # Do one refresh step to maintain a consistent data structure and return.
+    LOG.verbose(f"Initializing Hopf")
     return refreshHopf(G, u, p, state, sp)
 
 def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
@@ -221,4 +227,28 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
     lead = int(_pick_near_axis(ritz_vals, 1, omega_min)[0])
     omega=float(abs(np.imag(ritz_vals[lead])))
     state = {"V": V, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs, "lead": lead, "omega": omega}
+    LOG.verbose(f"Lead Eigenvalue {ritz_vals}")
     return state
+
+def detectHopf(prev_state : Dict,
+               curr_state : Dict) -> bool:
+    """
+    Main Hopf detection algorith. Checks if the real parts of the leading eigenvalues
+    in the state dicts have a different sign.
+
+    Parameters
+    ----------
+    prev_state : Dict
+        State of the Hopf detection function at the previous point.
+    curr_state : Dict
+        State of the Hopf detection function at the current point.
+
+    Returns
+    -------
+    is_hopf : bool
+        True if a Hopf point lies between the two points, False otherwise.
+    """
+    prev_leading_ritz_value = prev_state["ritz_vals"][prev_state["lead"]]
+    curr_leading_ritz_value = curr_state["ritz_vals"][curr_state["lead"]]
+
+    return np.real(prev_leading_ritz_value) * np.real(curr_leading_ritz_value) < 0.0

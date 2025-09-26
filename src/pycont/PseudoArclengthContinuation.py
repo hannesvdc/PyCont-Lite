@@ -5,7 +5,7 @@ import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
 from .Bifurcation import computeBifurcationPoint, test_fn_jacobian_multi
-from .Hopf import initializeHopf, refreshHopf
+from .Hopf import initializeHopf, refreshHopf, detectHopf
 
 from .Types import Branch, Event
 from .Logger import LOG
@@ -217,6 +217,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		if hopf_detection and n % 5 == 0:
 			hopf_state = refreshHopf(G, x_new[0:M], x_new[M], prev_hopf_state, sp)
+			is_hopf = detectHopf(prev_hopf_state, hopf_state)
+			if is_hopf:
+				LOG.info(f"Hopf Point Detected near {x_new}.")
 			prev_hopf_state = hopf_state
 
 		# Bookkeeping for the next step
