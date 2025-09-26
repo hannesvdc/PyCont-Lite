@@ -3,7 +3,7 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Literal, Dict, Optional
 
-EventKind = Literal["SP", "LP", "BP", "DSFLOOR", "MAXSTEPS", "PARAM_MIN", "PARAM_MAX"]
+EventKind = Literal["SP", "LP", "BP", "HB", "DSFLOOR", "MAXSTEPS", "PARAM_MIN", "PARAM_MAX"]
 
 @dataclass
 class Event:

@@ -220,6 +220,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			is_hopf = detectHopf(prev_hopf_state, hopf_state)
 			if is_hopf:
 				LOG.info(f"Hopf Point Detected near {x_new}.")
+				termination_event = Event("HB", x_new[0:M], x_new[M], new_s, info={"tangent": new_tangent})
+				branch.addPoint(x_new[0:M], x_new[M], new_s)
+				branch.termination_event = termination_event
+				return branch.trim(), termination_event
 			prev_hopf_state = hopf_state
 
 		# Bookkeeping for the next step

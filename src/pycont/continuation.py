@@ -264,6 +264,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     """
     branch_id = len(result.branches)
     LOG.info(f'\n\nContinuation on Branch {branch_id + 1}')
+    M = len(u0)
     
     # Do regular continuation on this branch
     branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, sp)
@@ -280,12 +281,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         branch.stable = (rightmost_eigenvalue_realpart < 0.0)
         LOG.info('Stable' if branch.stable else 'Unstable')
 
-    # If there are no bifurcation or fold points on this path, return
-    if termination_event.kind != "LP" and termination_event.kind != "BP":
-        return
-
     # If the last point on the previous branch was a fold point, create a new segment where the last one ended.
-    elif termination_event.kind == "LP":
+    if termination_event.kind == "LP":
         u_final = termination_event.u
         p_final = termination_event.p
         final_tangent = termination_event.info["tangent"]
@@ -311,8 +308,13 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
-        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
             tangent = computeTangent(G, x0[0:M], x0[M], tangents[n], sp)
             _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+
+    # If we ended on a Hopf point, calculate the limit cycle and continue both.
+    elif termination_event.kind == "HB":
+        x_hopf = np.append(termination_event.u, termination_event.p)
+        tangent = termination_event.info["tangent"]
+        _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
