@@ -132,7 +132,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
     n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-    hopf_detection = sp.setdefault("hopf_detection", False)
+    hopf_detection = sp.setdefault("hopf_detection", True)
     r_keep = sp.setdefault("r_keep", 2)
     m_target = sp.setdefault("m_target", 16)
 
