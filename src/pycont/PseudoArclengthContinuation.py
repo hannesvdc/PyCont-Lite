@@ -171,7 +171,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			return branch.trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
-		new_tangent = computeTangent(G, x[0:M], x[M], tangent, sp)
+		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 5:
@@ -183,7 +183,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 				# Append the fold point and x_new to the current path
 				s_fold = s + alpha_fold * (new_s - s)
-				branch.addPoint(x_fold[0:M], x_fold[M], s_fold)
+				branch.addPoint(x_fold, s_fold)
 				
 				# Stop continuation along this branch
 				termination_event = Event("LP", x_fold[0:M], x_fold[M], s_fold, {"tangent": new_tangent})
@@ -204,7 +204,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 				if is_bf_point:
 					LOG.info(f'Bifurcation Point at {x_singular}')
 					s_singular = s + alpha_singular * (new_s - s)
-					branch.addPoint(x_singular[0:M], x_singular[M], s_singular)
+					branch.addPoint(x_singular, s_singular)
 					termination_event = Event("BP", x_singular[0:M], x_singular[M], s_singular)
 					branch.termination_event = termination_event
 					return branch.trim(), termination_event
@@ -220,8 +220,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			is_hopf = detectHopf(prev_hopf_state, hopf_state)
 			if is_hopf:
 				LOG.info(f"Hopf Point Detected near {x_new}.")
+				# TODO: Add localization code.
+
 				termination_event = Event("HB", x_new[0:M], x_new[M], new_s, info={"tangent": new_tangent})
-				branch.addPoint(x_new[0:M], x_new[M], new_s)
+				branch.addPoint(x_new, new_s)
 				branch.termination_event = termination_event
 				return branch.trim(), termination_event
 			prev_hopf_state = hopf_state
@@ -230,7 +232,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		tangent = np.copy(new_tangent)
 		x = np.copy(x_new)
 		s = new_s
-		branch.addPoint(x[0:M], x[M], s)
+		branch.addPoint(x, s)
 		
 		# Print the status
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"

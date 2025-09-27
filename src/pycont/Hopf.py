@@ -188,7 +188,6 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
 
     return {"eig_vals": eig_vals_new, "eig_vecs": eig_vecs_new, "lead": lead, "omega": omega}
 
-
 def detectHopf(prev_state : Dict,
                curr_state : Dict) -> bool:
     """

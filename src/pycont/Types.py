@@ -32,9 +32,9 @@ class Branch:
 		self.s_path = np.zeros(n_steps+1)
 		self._index = 1
 
-	def addPoint(self, u : np.ndarray, p : float, s : float):
-		self.u_path[self._index, :] = u
-		self.p_path[self._index] = p
+	def addPoint(self, x : np.ndarray, s : float):
+		self.u_path[self._index, :] = x[0:-1]
+		self.p_path[self._index] = x[-1]
 		self.s_path[self._index] = s
 		self._index += 1
 
