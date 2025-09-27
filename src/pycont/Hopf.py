@@ -105,7 +105,6 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
     # Pick the lead eigenvalue and return a Hopf state
     eigvals, V = _filterComplexConjugated(eigvals, V, omega_min)
     lead = _pick_near_axis(eigvals, omega_min)
-    LOG.verbose(f'lead {lead}')
     if lead != -1 and np.abs(np.real(eigvals[lead])) < 1e-10:
         eigvals[lead] = 1j * np.imag(eigvals[lead])
     LOG.verbose(f'eigvals{eigvals}')
@@ -172,10 +171,10 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128) # type:ignore
 
         #inexact solve: (J - sigma I) w = v0
-        w, info = slg.lgmres(A, v0, atol=1e-2, maxiter=10)
+        w, info = slg.lgmres(A, v0, maxiter=8)
         residual = np.linalg.norm(A_mv(w) - v0)
-        LOG.verbose(f'LGRMES Resisdual {residual}')
         v_new = w / (np.linalg.norm(w) + 1e-16)
+        LOG.verbose(f'LGRMES Resisdual {residual}')
 
         # Rayleigh quotient update
         Jv_v_new = Jv(v_new)
