@@ -1,10 +1,9 @@
 import numpy as np
 import scipy.sparse.linalg as slg
 
-from .Logger import LOG, Verbosity
+from .Logger import LOG
 
 from typing import Callable, Dict, Tuple
-import time
 
 def _pick_near_axis(vals: np.ndarray, omega_min: float) -> int:
     """
@@ -81,7 +80,7 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         part of this eigenvalue.
     """
     LOG.verbose(f"Initializing Hopf")
-    m_eigs = sp["m_target"]
+    m_eigs = sp["n_hopf_eigenvalues"]
     omega_min = 1e-3
 
     # Create JVP
@@ -158,7 +157,6 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
     rdiff = sp["rdiff"]
     Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
-    start = time.time()
     for i, (sigma_i, v_i) in enumerate(zip(eig_vals_prev, eig_vecs_prev.T)):
         v0 = v_i.astype(np.complex128, copy=False)
         nv = np.linalg.norm(v0)
@@ -182,21 +180,6 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         sigma_new = np.vdot(v_new, Jv_v_new) / np.vdot(v_new, v_new)
         eig_vals_new[i] = sigma_new
         eig_vecs_new[:, i] = v_new
-    end = time.time()
-    LOG.verbose(f'Rayleigh Update Time {end-start}')
-
-    # Also show the exact eigenvalues for reference
-    if LOG._verbosity == Verbosity.VERBOSE:
-        start = time.time()
-        k_pool = min(sp["m_target"], max(1, M-2))
-        guess = prev_hopf_state["eig_vecs"][:,prev_hopf_state["lead"]]
-        A = slg.LinearOperator(shape=(M, M), 
-                                matvec=lambda v: Jv(v.astype(np.complex128, copy=False)), # type:ignore
-                                dtype=np.complex128)
-        eigvals_ref, _ = slg.eigs(A, k=k_pool, which="LR", v0=guess) # type: ignore[reportAssignmentType]
-        end = time.time()
-        LOG.verbose(f'Scipy eigs time {end-start}')
-        LOG.verbose(f'Exact Hopf Eigenvalue {eigvals_ref[_pick_near_axis(eigvals_ref, omega_min)]}')
 
     # Pick lead complex eigenvalue closest to imaginary axis
     lead = _pick_near_axis(eig_vals_new, omega_min)  # returns -1 if none
