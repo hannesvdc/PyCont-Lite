@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Orthonormalizing** l- and r- vectors for bifurcation detection. Also projecting all l-vectors off the initial tangent.
 - **Multiple Bifurcation Test vectors** for more robust bifurcation detection.
+- **Hopf Bifurcation Detection** by keeping track of the few rightmost eigenvalues and updating with a Rayleigh iteration.
+
+### Changed
+- **Bifurcation detection before fold detection** because BP has priority.
 
 ### Removed
 - **testfunctions.py** the bordered test for bifurcation points is already included in Bifurcation.py
