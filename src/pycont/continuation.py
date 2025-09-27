@@ -132,14 +132,12 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
     n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-    hopf_detection = sp.setdefault("hopf_detection", True)
-    r_keep = sp.setdefault("r_keep", 2)
+    hopf_detection = sp.setdefault("hopf_detection", False)
     m_target = sp.setdefault("m_target", 16)
 
     # Perform basic checks on some parameters without raising an error
-    sp["r_keep"] = min(M, r_keep)
     sp["m_target"] = min(m_target, M)
-    LOG.verbose(f'Hopf detector {sp["r_keep"]} and {sp["m_target"]}.')
+    LOG.verbose(f'Hopf detector {sp["m_target"]}.')
 
     # Perform necessary chechs on the user's input
     G0 = G(u0, p0)
@@ -166,8 +164,6 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     if n_bifurcation_vectors < 0:
         raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
-    if r_keep > m_target:
-        raise InputError(f"r_keep cannot be larger than m_target for Hopf bifurcation detection, got {r_keep} and {m_target}.")
     if hopf_detection and M < 2:
         raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
 
