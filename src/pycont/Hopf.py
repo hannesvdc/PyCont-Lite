@@ -148,7 +148,7 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
     if M > 2:
         k_pool = min(m_eigs, max(1, M-2))
         A = slg.LinearOperator(shape=(M, M), 
-                               matvec=lambda v: Jv(v.astype(np.complex128, copy=False)),
+                               matvec=lambda v: Jv(v.astype(np.complex128, copy=False)), # type:ignore
                                dtype=np.complex128)
         eigvals, V = slg.eigs(A, k=k_pool, which="LR", return_eigenvectors=True) # type: ignore[reportAssignmentType]
     elif M == 2: # edge case M = 2. Compute eigenvalues explicitly
@@ -160,10 +160,10 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
     # Pick the lead eigenvalue and return a Hopf state
     eigvals, V = _filterComplexConjugated(eigvals, V, omega_min)
     lead = _pick_near_axis(eigvals, omega_min)
-    print('lead', lead)
+    LOG.verbose(f'lead {lead}')
     if lead != -1 and np.abs(np.real(eigvals[lead])) < 1e-10:
         eigvals[lead] = 1j * np.imag(eigvals[lead])
-    print('eigvals', eigvals)
+    LOG.verbose(f'eigvals{eigvals}')
     omega = float(abs(eigvals[lead].imag)) if lead != -1 else 0.0
     state = {
         "eig_vals" : eigvals, "eig_vecs" : V, "lead" : lead, "omega" : omega
@@ -225,26 +225,24 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         def A_mv(x):
             x = x.astype(np.complex128, copy=False)
             return Jv(x) - shift * x
-        A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128)
-        #w = opt.newton_krylov(A_mv, v0, f_tol=gmres_tol)
+        A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128) # type:ignore
 
         # inexact solve: (J - sigma I) w = v0
         w, info = slg.lgmres(A, v0, atol=gmres_tol, maxiter=10)
         residual = np.linalg.norm(A_mv(w) - v0)
-        print('LGRMES Resisdual', residual)
+        LOG.verbose(f'LGRMES Resisdual {residual}')
         v = w / (np.linalg.norm(w) + 1e-16)
 
         # Rayleigh quotient update
         Jv_v = Jv(v)
         sigma_new = np.vdot(v, Jv_v) / np.vdot(v, v)
-
         eig_vals_new[i] = sigma_new
         eig_vecs_new[:, i] = v
 
     # Pick lead complex eigenvalue closest to imaginary axis
     lead = _pick_near_axis(eig_vals_new, omega_min)  # returns -1 if none
     omega = float(abs(eig_vals_new[lead].imag)) if lead != -1 else 0.0
-    print('Hopf Value', eig_vals_new[lead])
+    LOG.verbose(f'Hopf Value {eig_vals_new[lead]}')
 
     return {"eig_vals": eig_vals_new, "eig_vecs": eig_vecs_new, "lead": lead, "omega": omega}
 
