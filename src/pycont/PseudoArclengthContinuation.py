@@ -121,7 +121,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	# Initialize Hopf detector if activated
 	if hopf_detection:
-		prev_hopf_state = initializeHopf(G, u0, p0, sp["m_target"], sp)
+		prev_hopf_state = initializeHopf(G, u0, p0, sp)
 
 	for n in range(1, n_steps+1):
 		# Create the extended system for corrector

@@ -1,10 +1,20 @@
 import numpy as np
 import scipy.sparse.linalg as slg
+import scipy.optimize as opt
 
 from .Logger import LOG
 
 from typing import Callable, Dict, Tuple
 
+def _project_H(Jv, V):
+    k = V.shape[1]
+    H = np.zeros((k, k), dtype=np.complex128)
+    for j in range(k):
+        w = Jv(V[:, j])
+        for i in range(k):
+            H[i, j] = np.vdot(V[:, i], w)
+    return H
+    
 def _orthonormalize(X: np.ndarray) -> np.ndarray:
     """
     Internal function that orthonormalizes the columns of matrix X.
@@ -20,107 +30,85 @@ def _orthonormalize(X: np.ndarray) -> np.ndarray:
         Matrix with orthonormal columns. `n_output_vecs <= n_input_vecs` is guarenteed. 
         Inequality is strict when two or more columns of `X` are linearly dependent.
     """
+    dtype = np.complex128
+    tol = 1e-14
+
     column_index = 0
-    V = np.zeros_like(X)
+    V = np.zeros_like(X, dtype=dtype)
     for j in range(X.shape[1]):
-        w = X[:, j]
+        # work in complex and copy so we don't mutate X
+        w = X[:, j].astype(dtype, copy=True)
+
+        # ---- pass 1 ----
         for i in range(column_index):
-        #for v in V:
-            w -= np.vdot(V[:,i], w) * V[:,i]
-        norm_w = np.sqrt(np.vdot(w, w))
-        if norm_w > 0:
-            V[:,column_index] = w / norm_w
-            column_index += 1
-    return V[:,:column_index]
+            w -= np.vdot(V[:, i], w) * V[:, i]
+        norm_w = np.linalg.norm(w)
+        if norm_w <= tol:
+            continue
+        w /= norm_w
 
-def arnoldi_from_seed(Jv: Callable[[np.ndarray], np.ndarray],
-                      V0: np.ndarray, 
-                      m_target: int) -> Tuple[np.ndarray, np.ndarray]:
+        # ---- pass 2 (re-orthogonalization) ----
+        for i in range(column_index):
+            w -= np.vdot(V[:, i], w) * V[:, i]
+        norm_w = np.linalg.norm(w)
+        if norm_w <= tol:
+            continue
+        w /= norm_w
+
+        # accept column
+        V[:, column_index] = w
+        column_index += 1
+
+    return V[:, :column_index]
+
+def _pick_near_axis(vals: np.ndarray, omega_min: float) -> int:
     """
-    Construct `m_target` orthonormal vectors using the Arnoldi method
-    starting from the columns of `V0` as seed. 
+    Return the index of the complex eigenvalue (|Im| > omega_min)
+    closest to the imaginary axis (min |Re|).
 
-    Parameters
-    ----------
-    Jv : Callable
-        Jacobian-vector product of the objective function `F`.
-    V0 : ndarray
-        Initial orthonormal vectors as columns used as seed.
-    m_target : int
-        Total number of orthonormal vectors to build.
-
-    Returns
-    -------
-    V : ndarray
-        Matrix with orthonormal columns created by applying `Jv` to `V0` repeatedly.
-    H : ndarrray
-        Square upper Hessenberg matrix, obtained for free from the Arnoldi method.
+    Returns -1 if none qualify.
     """
-    dtype = V0.dtype
-    r_keep = V0.shape[1]
-    V = np.zeros((V0.shape[0], m_target), dtype=dtype)
-    V[:,:r_keep] = V0
-    H = np.zeros((m_target + 1, m_target), dtype=dtype)
-
-    # Initialize V and H from the seed.
-    m = r_keep
-    for j in range(r_keep):
-        w = Jv(V[:, j])
-        for i in range(m):
-            hij = np.vdot(V[:, i], w); H[i, j] = hij; w -= hij * V[:, i]
-        hj = np.linalg.norm(w); H[m, j] = hj
-
-        # Append the new vector w to V
-        if hj > 0.0 and m < m_target:
-            V[:, m] = w / hj
-            m += 1
-        else:
-            LOG.verbose(f'Happy breakdown at index {m} because {hj} and {m_target}')
-
-    # Start Arnoldi scheme from V - the updated seed.
-    while m < m_target:
-        j = m - 1
-        w = Jv(V[:, j])
-        for i in range(m):
-            hij = np.vdot(V[:, i], w); H[i, j] = hij; w -= hij * V[:, i]
-        hj = np.linalg.norm(w); H[m, j] = hj
-
-        if hj == 0.0: break # Happy breakdown
-        V[:, m] = w / hj
-        m += 1
-
-    # Return the orthonormal vectors and the associated upper-Hessenberg matrix.
-    return V[:,:m], H[:m, :m]
-
-def _pick_near_axis(vals: np.ndarray, 
-                    r: int, 
-                    omega_min: float) -> np.ndarray:
-    """Helper function to pick the eigenvalue closest to the imaginary axis that
-    has a non-zero imaginary component.
-    
-    Parameters
-    ----------
-    vals : ndarray
-        The current eigenvalues.
-    r : int
-        The number of eigenvalues to maintain.
-    omega_min : float
-        Minimal threshold to select eigenvalues that have a non-zero imaginary component.
-
-    Returns
-    -------
-    minimal_eigvals : ndarray
-        (Complex conjugated pair of) eigenvalues closest to the imaginary axis.
-    """
+    vals = np.asarray(vals, dtype=np.complex128)
     mask = np.where(np.abs(np.imag(vals)) > omega_min)[0]
     if mask.size == 0:
-        mask = np.arange(vals.size)
-    return mask[np.argsort(np.abs(np.real(vals[mask])))[:min(r, mask.size)]]
+        return -1
+    return int(mask[np.abs(np.real(vals[mask])).argmin()])
+
+def _filterComplexConjugated(eigvals: np.ndarray,
+                             eigvecs: np.ndarray,
+                             omega_min: float) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Keep:
+      - all ~real eigenvalues (|Im(λ)| <= omega_min)
+      - complex eigenvalues with strictly positive imaginary part (Im(λ) > omega_min)
+    Drop the corresponding negative-imaginary partners.
+    Returns filtered eigenvalues and matching eigenvectors (columns).
+
+    Parameters
+    ----------
+    eigvals : (m,) complex ndarray
+    eigvecs : (n, m) complex ndarray
+        Eigenvectors in columns aligned with eigvals.
+    omega_min : float
+        Imag threshold to consider Im(λ) ~ 0 (i.e., real).
+
+    Returns
+    -------
+    vals_out : (k,) complex ndarray
+    vecs_out : (n, k) complex ndarray
+    """
+    # Real if |Im| ≤ omega_min; complex+ if Im > omega_min
+    real_mask = np.abs(np.imag(eigvals)) <= omega_min
+    pos_imag_mask = np.imag(eigvals) > omega_min
+    keep_mask = real_mask | pos_imag_mask
+
+    vals_out = eigvals[keep_mask]
+    vecs_out = eigvecs[:, keep_mask]
+    return vals_out, vecs_out
 
 def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
                    u : np.ndarray,
                    p : float,
-                   m0: int,
                    sp: Dict) -> Dict:
     """
     Initialize the Hopf Bifurcation Detection Method by generating the eigenvalues 
@@ -137,56 +125,61 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The current state vector on the path.
     p : float
         The current parameter value.
-    m0 : int
-        The initial number of eigenpairs to compute.
     sp : Dict
         Solver parameters including arguments `keep_r` and `m_target`.
 
     Returns
     -------
-    state: Dict
-        Contains the current eigenspace "V", the Hessenberg matrix "H", the
-        Ritz values and vectors "ritz_vals" and "ritz_vecs", index "lead" of the eigenvalue 
-        closes to the imaginary axis, and "omega" the imaginary part of this eigenvalue.
+    hopf_state: Dict
+        Contains the current eigenvalues "eig_vals" and eigenvectors "eig_vecs", index 
+        "lead" of the eigenvalue  closes to the imaginary axis, and "omega" the imaginary
+        part of this eigenvalue.
     """
+    LOG.verbose(f"Initializing Hopf")
+    m_eigs = sp["m_target"]
+    omega_min = 1e-3
+
+    # Create JVP
     M = len(u)
     rdiff = sp["rdiff"]
     Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
     # Compute the initial seed of many eigenvectors with largest real part (see assumption).
     if M > 2:
-        k_pool = min(m0, max(1, M-2))
-        A = slg.LinearOperator((M, M), Jv)
-        vals_full, V = slg.eigs(A, k=k_pool, which="LR", return_eigenvectors=True) # type: ignore[reportAssignmentType]
-
-        # Compute Ritz eigenvalues and vectors (vals and vecs)
-        Q, R = np.linalg.qr(V)  # Q: (n,k), R: (k,k)
-        Rinv = np.linalg.solve(R, np.eye(R.shape[0]))
-        H = R @ np.diag(vals_full) @ Rinv
-        ritz_vals, ritz_vecs = np.linalg.eig(H)
-        state = {"V": Q, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
-    elif M == 2: # edge case M = 2. Compute Ritz values explicitly
+        k_pool = min(m_eigs, max(1, M-2))
+        A = slg.LinearOperator(shape=(M, M), 
+                               matvec=lambda v: Jv(v.astype(np.complex128, copy=False)),
+                               dtype=np.complex128)
+        eigvals, V = slg.eigs(A, k=k_pool, which="LR", return_eigenvectors=True) # type: ignore[reportAssignmentType]
+    elif M == 2: # edge case M = 2. Compute eigenvalues explicitly
         e1 = np.array([1.0, 0.0])
         e2 = np.array([0.0, 1.0])
         J  = np.column_stack((Jv(e1), Jv(e2)))
+        eigvals, V = np.linalg.eig(J)
 
-        V = np.eye(2)             # orthonormal basis spanning R^2
-        H = J                     # H = V^* J V = J
-        ritz_vals, ritz_vecs = np.linalg.eig(H)
-        state = {"V": V, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs}
-
-    # Do one refresh step to maintain a consistent data structure and return.
-    LOG.verbose(f"Initializing Hopf")
-    return refreshHopf(G, u, p, state, sp)
+    # Pick the lead eigenvalue and return a Hopf state
+    eigvals, V = _filterComplexConjugated(eigvals, V, omega_min)
+    lead = _pick_near_axis(eigvals, omega_min)
+    print('lead', lead)
+    if lead != -1 and np.abs(np.real(eigvals[lead])) < 1e-10:
+        eigvals[lead] = 1j * np.imag(eigvals[lead])
+    print('eigvals', eigvals)
+    omega = float(abs(eigvals[lead].imag)) if lead != -1 else 0.0
+    state = {
+        "eig_vals" : eigvals, "eig_vecs" : V, "lead" : lead, "omega" : omega
+    }
+    return state
 
 def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
                 u : np.ndarray,
                 p : float,
-                state: Dict,
+                prev_hopf_state : Dict,
                 sp: Dict) -> Dict:
     """
-    Update the Hopf bifurcation detection function at the new point starting from
-    information at the previous point.
+    Recompute Hopf state by updating the eigenvalues closest to the imaginary axis. 
+    Updating is done by one iteration of the Rayleigh method: for each eigenpair
+    (sigma_i, vi) at the previous point, we solve (J - simga_i I) v = v_i and compute
+    the new eigenvalue as the Rayleigh coefficient <J v, v>. 
 
     Parameters
     ----------
@@ -196,39 +189,65 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The current state vector on the path.
     p : float
         The current parameter value.
-    state: Dict
-        The Hopf eigenstate at a previous point, used as seed for the new Arnoldi method.
+    prev_hopf_state : Dict
+        The Hopf state at the previous continuation point.
     sp : Dict
         Solver parameters including arguments `keep_r` and `m_target`.
 
     Returns
     -------
-    state: Dict
-        Contains the current eigenspace "V", the Hessenberg matrix "H", the
-        Ritz values and vectors "ritz_vals" and "ritz_vecs", index "lead" of the eigenvalue 
-        closes to the imaginary axis, and "omega" the imaginary part of this eigenvalue.
+    hopf_state: Dict
+        Contains the current eigenvalues "eig_vals" and eigenvectors "eig_vecs", index 
+        "lead" of the eigenvalue  closes to the imaginary axis, and "omega" the imaginary
+        part of this eigenvalue.
     """
-    rdiff = sp["rdiff"]
-    keep_r = sp["r_keep"]
-    m_target = sp["m_target"]
+    jitter = 0.001
+    gmres_tol = 1e-2
     omega_min = 1e-3
+
+    eig_vals_prev = prev_hopf_state["eig_vals"]
+    eig_vecs_prev = prev_hopf_state["eig_vecs"]
+    eig_vals_new = np.empty_like(eig_vals_prev, dtype=np.complex128)
+    eig_vecs_new = np.empty_like(eig_vecs_prev, dtype=np.complex128)
+
+    # Create JVP
+    M = len(u)
+    rdiff = sp["rdiff"]
     Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
-    # Pick the Ritz pair closest to the imaginary axis and lift them to the full-dimensional space
-    idx = _pick_near_axis(state["ritz_vals"], keep_r, omega_min)
-    V0  = state["V"] @ state["ritz_vecs"][:, idx]   # lift reduced Ritz vecs to full space
-    V0  = _orthonormalize(V0)
+    for i, (sigma_i, v_i) in enumerate(zip(eig_vals_prev, eig_vecs_prev.T)):
+        v0 = v_i.astype(np.complex128, copy=False)
+        nv = np.linalg.norm(v0)
+        v0 = v0 / nv
 
-    # Update the eigenmodes starting from V0 as seed
-    V, H = arnoldi_from_seed(Jv, V0, m_target)
-    ritz_vals, ritz_vecs = np.linalg.eig(H)
+        # define (J - sigma I) operator, with a tiny imaginary jitter for stability
+        shift = sigma_i + 1j * jitter
+        def A_mv(x):
+            x = x.astype(np.complex128, copy=False)
+            return Jv(x) - shift * x
+        A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128)
+        #w = opt.newton_krylov(A_mv, v0, f_tol=gmres_tol)
 
-    # Pick the current leading complex conjugated eigenpair and return a state dict.
-    lead = int(_pick_near_axis(ritz_vals, 1, omega_min)[0])
-    omega=float(abs(np.imag(ritz_vals[lead])))
-    state = {"V": V, "H": H, "ritz_vals": ritz_vals, "ritz_vecs": ritz_vecs, "lead": lead, "omega": omega}
-    LOG.verbose(f"Lead Eigenvalue {ritz_vals}")
-    return state
+        # inexact solve: (J - sigma I) w = v0
+        w, info = slg.lgmres(A, v0, atol=gmres_tol, maxiter=10)
+        residual = np.linalg.norm(A_mv(w) - v0)
+        print('LGRMES Resisdual', residual)
+        v = w / (np.linalg.norm(w) + 1e-16)
+
+        # Rayleigh quotient update
+        Jv_v = Jv(v)
+        sigma_new = np.vdot(v, Jv_v) / np.vdot(v, v)
+
+        eig_vals_new[i] = sigma_new
+        eig_vecs_new[:, i] = v
+
+    # Pick lead complex eigenvalue closest to imaginary axis
+    lead = _pick_near_axis(eig_vals_new, omega_min)  # returns -1 if none
+    omega = float(abs(eig_vals_new[lead].imag)) if lead != -1 else 0.0
+    print('Hopf Value', eig_vals_new[lead])
+
+    return {"eig_vals": eig_vals_new, "eig_vecs": eig_vecs_new, "lead": lead, "omega": omega}
+
 
 def detectHopf(prev_state : Dict,
                curr_state : Dict) -> bool:
@@ -248,7 +267,10 @@ def detectHopf(prev_state : Dict,
     is_hopf : bool
         True if a Hopf point lies between the two points, False otherwise.
     """
-    prev_leading_ritz_value = prev_state["ritz_vals"][prev_state["lead"]]
-    curr_leading_ritz_value = curr_state["ritz_vals"][curr_state["lead"]]
+    if prev_state["lead"] < 0 or curr_state["lead"] < 0:
+        return False
+    
+    prev_leading_ritz_value = prev_state["eig_vals"][prev_state["lead"]]
+    curr_leading_ritz_value = curr_state["eig_vals"][curr_state["lead"]]
 
     return np.real(prev_leading_ritz_value) * np.real(curr_leading_ritz_value) < 0.0
