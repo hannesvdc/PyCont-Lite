@@ -75,25 +75,27 @@ def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 			The location of the fold point within the tolerance.
 	"""
 	rdiff = sp["rdiff"]
+	M = len(x_left)-1
 
 	def make_F_ext(alpha : float) -> Callable[[np.ndarray], np.ndarray]:
 		ds_alpha = alpha * ds
 		N = lambda q: np.dot(tangent_ref, q - x_left) - ds_alpha
-		F = lambda q: np.append(G(q[0:-1], q[-1]), N(q))
+		F = lambda q: np.append(G(q[0:M], q[M]), N(q))
 		return F
 	def finalTangentComponent(alpha):
 		F = make_F_ext(alpha)
 		with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
 			x_alpha = opt.newton_krylov(F, x_left, rdiff=rdiff)
-		tangent = computeTangent(G, x_alpha[0:-1], x_alpha[-1], tangent_ref, sp)
-		return tangent[-1]
+		tangent = computeTangent(G, x_alpha[0:M], x_alpha[M], tangent_ref, sp)
+		return tangent[M]
 	
 	try:
+		LOG.info(f'BrentQ edge values {finalTangentComponent(-1.0)},  {finalTangentComponent(2.0)}')
 		alpha_fold, result = opt.brentq(finalTangentComponent, -2.0, 2.0, full_output=True, disp=False)
 	except ValueError: # No sign change detected
 		return False, x_right, 1.0
 	except opt.NoConvergence:
-		return False, x_left, 1.0
+		return False, x_left, 0.0
 	
 	x_fold = x_left + alpha_fold * (x_right - x_left)
 	return True, x_fold, alpha_fold

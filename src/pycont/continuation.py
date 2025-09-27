@@ -112,12 +112,16 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
       or bifurcations.
     - Ensure u0 is a converged solution of G(u, p0)=0 for best reliability.
     """
+    # Create the logger based on the user's verbosity requirement.
+    configureLOG(verbosity=verbosity)
+
+    # Parse the input state
     u0 = _as_1d_float(u0, "u0")
     p0 = _as_scalar_float(p0, "p0")
     M = len(u0)
     
     # Verify and set default the solver parameters
-    sp = {} if solver_parameters is None else dict(solver_parameters) # shallow copy to avoid changing the user's dict
+    sp = {} if solver_parameters is None else dict(solver_parameters)
     rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
@@ -128,9 +132,12 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
     n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
+    hopf_detection = sp.setdefault("hopf_detection", False)
+    n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
 
-    # Create the logger based on the user's verbosity requirement.
-    configureLOG(verbosity=verbosity)
+    # Perform basic checks on some parameters without raising an error
+    sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
+    LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
 
     # Perform necessary chechs on the user's input
     G0 = G(u0, p0)
@@ -157,10 +164,11 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     if n_bifurcation_vectors < 0:
         raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
+    if hopf_detection and M < 2:
+        raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
-    M = len(u0)
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         try:
             u1 = opt.newton_krylov(lambda uu: G(uu, p0 + rdiff), u0, f_tol=tolerance, rdiff=rdiff, maxiter=nk_maxiter)
@@ -252,6 +260,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     """
     branch_id = len(result.branches)
     LOG.info(f'\n\nContinuation on Branch {branch_id + 1}')
+    M = len(u0)
     
     # Do regular continuation on this branch
     branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, sp)
@@ -268,12 +277,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         branch.stable = (rightmost_eigenvalue_realpart < 0.0)
         LOG.info('Stable' if branch.stable else 'Unstable')
 
-    # If there are no bifurcation or fold points on this path, return
-    if termination_event.kind != "LP" and termination_event.kind != "BP":
-        return
-
     # If the last point on the previous branch was a fold point, create a new segment where the last one ended.
-    elif termination_event.kind == "LP":
+    if termination_event.kind == "LP":
         u_final = termination_event.u
         p_final = termination_event.p
         final_tangent = termination_event.info["tangent"]
@@ -299,8 +304,13 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         directions, tangents = brs.branchSwitching(G, x_singular, x_prev, sp)
 
         # For each of the branches, run pseudo-arclength continuation
-        M = len(u0)
         for n in range(len(directions)):
             x0 = directions[n]
             tangent = computeTangent(G, x0[0:M], x0[M], tangents[n], sp)
             _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+
+    # If we ended on a Hopf point, calculate the limit cycle and continue both.
+    elif termination_event.kind == "HB":
+        x_hopf = np.append(termination_event.u, termination_event.p)
+        tangent = termination_event.info["tangent"]
+        _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)

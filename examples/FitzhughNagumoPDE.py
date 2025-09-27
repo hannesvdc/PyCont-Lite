@@ -52,7 +52,7 @@ def FitzhughNagumoTest():
         v0 = sigmoid(x, 15, 0.0, 2.0, 0.1)
         z0 = opt.newton_krylov(lambda z : G(z, eps0), np.concatenate((u0, v0)), f_tol=1e-9, method='lgmres')
         np.save(datafile, z0)
-    print('Initial Residual:', np.linalg.norm(G(z0, eps0)))
+    print('Initial FHN Residual:', np.linalg.norm(G(z0, eps0)))
 
     # Do continuation. The Fitzhugh-Nagumo equations are much worse conditioned than the Bratu PDE because
     # the Jacbian is very non-normal. We must use a small tolerance.
@@ -61,8 +61,8 @@ def FitzhughNagumoTest():
     ds_min = 1e-6
     ds0 = 1e-3
     n_steps = 1000
-    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01}
-    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
+    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters)
 
     # Plot the bifurcation diagram eps versus <u>
     u_transform = lambda z: np.average(z[:N])

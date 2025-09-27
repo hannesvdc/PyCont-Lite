@@ -58,9 +58,15 @@ def rightmost_eig_realpart(G : Callable[[np.ndarray, float], np.ndarray],
     rdiff = sp["rdiff"]
     jacobian = _makeJacobianOperator(G, u, p, rdiff)
 
-    # Special case for one-dimensional state vectors - Arnoldi won't work
+    # Special cases for one and two-dimensional state vectors - Arnoldi won't work
     if M == 1:
         rightmost_eigenvalue = jacobian(np.array([1.0]))
+    elif M == 2:
+        e1 = np.array([1.0, 0.0])
+        e2 = np.array([0.0, 1.0])
+        J  = np.column_stack((jacobian(e1), jacobian(e2)))
+        eig_vals = np.linalg.eigvals(J)
+        return np.max(np.real(eig_vals))
     else:
         J = slg.LinearOperator((M,M), jacobian)
         eig_vals = slg.eigs(J, k=1, which='LR', return_eigenvectors=False)
