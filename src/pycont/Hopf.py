@@ -157,6 +157,7 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
     rdiff = sp["rdiff"]
     Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
+    # Loop over previous eigenvalues and update with the new Jacobian
     for i, (sigma_i, v_i) in enumerate(zip(eig_vals_prev, eig_vecs_prev.T)):
         v0 = v_i.astype(np.complex128, copy=False)
         nv = np.linalg.norm(v0)

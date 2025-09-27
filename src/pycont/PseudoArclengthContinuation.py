@@ -173,24 +173,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
 
-		# Check whether we passed a fold point.
-		if new_tangent[M] * tangent[M] < 0.0 and n > 5:
-			is_fold_point, x_fold, alpha_fold = computeFoldPoint(G, x, x_new, new_tangent, ds, sp)
-			if not is_fold_point:
-				LOG.info('Erroneous Fold Point detection due to blow-up in tangent vector.')
-			else:
-				LOG.info(f'Fold point at {x_fold}')
-
-				# Append the fold point and x_new to the current path
-				s_fold = s + alpha_fold * (new_s - s)
-				branch.addPoint(x_fold, s_fold)
-				
-				# Stop continuation along this branch
-				termination_event = Event("LP", x_fold[0:M], x_fold[M], s_fold, {"tangent": new_tangent})
-				branch.termination_event = termination_event
-				return branch.trim(), termination_event
-
-		# Do bifurcation detection in the new point
+		# Do bifurcation detection in the new point (do extra check in case of a possible fold point)
 		if bifurcation_detection and n % 5 == 0:
 			w_vectors, w_values = test_fn_jacobian_multi(F, x_new, l_vectors, r_vectors, prev_w_vectors, sp)
 
@@ -214,6 +197,23 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			prev_w_vectors = w_vectors
 			prev_w_values = w_values
 			prev_bf_x = np.copy(x_new)
+
+		# Check whether we passed a fold point.
+		if new_tangent[M] * tangent[M] < 0.0 and n > 5:
+			is_fold_point, x_fold, alpha_fold = computeFoldPoint(G, x, x_new, new_tangent, ds, sp)
+			if not is_fold_point:
+				LOG.info('Erroneous Fold Point detection due to blow-up in tangent vector.')
+			else:
+				LOG.info(f'Fold point at {x_fold}')
+
+				# Append the fold point and x_new to the current path
+				s_fold = s + alpha_fold * (new_s - s)
+				branch.addPoint(x_fold, s_fold)
+				
+				# Stop continuation along this branch
+				termination_event = Event("LP", x_fold[0:M], x_fold[M], s_fold, {"tangent": new_tangent})
+				branch.termination_event = termination_event
+				return branch.trim(), termination_event
 
 		if hopf_detection and n % 5 == 0:
 			hopf_state = refreshHopf(G, x_new[0:M], x_new[M], prev_hopf_state, sp)
