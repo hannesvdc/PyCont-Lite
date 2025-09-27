@@ -6,61 +6,6 @@ from .Logger import LOG
 
 from typing import Callable, Dict, Tuple
 
-def _project_H(Jv, V):
-    k = V.shape[1]
-    H = np.zeros((k, k), dtype=np.complex128)
-    for j in range(k):
-        w = Jv(V[:, j])
-        for i in range(k):
-            H[i, j] = np.vdot(V[:, i], w)
-    return H
-    
-def _orthonormalize(X: np.ndarray) -> np.ndarray:
-    """
-    Internal function that orthonormalizes the columns of matrix X.
-
-    Parameters
-    ----------
-    X : ndarray (M+1, n_input_vecs)
-        Matrix with vectors in the columns.
-
-    Returns
-    -------
-    V : ndarray (M+1, n_output_vecs)
-        Matrix with orthonormal columns. `n_output_vecs <= n_input_vecs` is guarenteed. 
-        Inequality is strict when two or more columns of `X` are linearly dependent.
-    """
-    dtype = np.complex128
-    tol = 1e-14
-
-    column_index = 0
-    V = np.zeros_like(X, dtype=dtype)
-    for j in range(X.shape[1]):
-        # work in complex and copy so we don't mutate X
-        w = X[:, j].astype(dtype, copy=True)
-
-        # ---- pass 1 ----
-        for i in range(column_index):
-            w -= np.vdot(V[:, i], w) * V[:, i]
-        norm_w = np.linalg.norm(w)
-        if norm_w <= tol:
-            continue
-        w /= norm_w
-
-        # ---- pass 2 (re-orthogonalization) ----
-        for i in range(column_index):
-            w -= np.vdot(V[:, i], w) * V[:, i]
-        norm_w = np.linalg.norm(w)
-        if norm_w <= tol:
-            continue
-        w /= norm_w
-
-        # accept column
-        V[:, column_index] = w
-        column_index += 1
-
-    return V[:, :column_index]
-
 def _pick_near_axis(vals: np.ndarray, omega_min: float) -> int:
     """
     Return the index of the complex eigenvalue (|Im| > omega_min)
@@ -202,7 +147,6 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         part of this eigenvalue.
     """
     jitter = 0.001
-    gmres_tol = 1e-2
     omega_min = 1e-3
 
     eig_vals_prev = prev_hopf_state["eig_vals"]
@@ -223,21 +167,21 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         # define (J - sigma I) operator, with a tiny imaginary jitter for stability
         shift = sigma_i + 1j * jitter
         def A_mv(x):
-            x = x.astype(np.complex128, copy=False)
-            return Jv(x) - shift * x
+           x = x.astype(np.complex128, copy=False)
+           return Jv(x) - shift * x
         A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128) # type:ignore
 
-        # inexact solve: (J - sigma I) w = v0
-        w, info = slg.lgmres(A, v0, atol=gmres_tol, maxiter=10)
+        #inexact solve: (J - sigma I) w = v0
+        w, info = slg.lgmres(A, v0, atol=1e-2, maxiter=10)
         residual = np.linalg.norm(A_mv(w) - v0)
         LOG.verbose(f'LGRMES Resisdual {residual}')
-        v = w / (np.linalg.norm(w) + 1e-16)
+        v_new = w / (np.linalg.norm(w) + 1e-16)
 
         # Rayleigh quotient update
-        Jv_v = Jv(v)
-        sigma_new = np.vdot(v, Jv_v) / np.vdot(v, v)
+        Jv_v_new = Jv(v_new)
+        sigma_new = np.vdot(v_new, Jv_v_new) / np.vdot(v_new, v_new)
         eig_vals_new[i] = sigma_new
-        eig_vecs_new[:, i] = v
+        eig_vecs_new[:, i] = v_new
 
     # Pick lead complex eigenvalue closest to imaginary axis
     lead = _pick_near_axis(eig_vals_new, omega_min)  # returns -1 if none

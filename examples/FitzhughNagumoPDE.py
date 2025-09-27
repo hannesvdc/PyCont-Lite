@@ -61,7 +61,7 @@ def FitzhughNagumoTest():
     ds_min = 1e-6
     ds0 = 1e-3
     n_steps = 1000
-    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
+    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True, "initial_directions" : 'decrease_p'}
     continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters, 'verbose')
 
     # Plot the bifurcation diagram eps versus <u>
