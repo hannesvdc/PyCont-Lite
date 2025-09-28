@@ -4,7 +4,7 @@ import numpy.random as rd
 import scipy.optimize as opt
 
 from .Tangent import computeTangent, computeFoldPoint
-from .Bifurcation import computeBifurcationPoint, test_fn_jacobian_multi
+from .Bifurcation import initializeBifurcationDetection, computeBifurcationPoint, test_fn_jacobian_multi, detectBifurcationPoint
 from .Hopf import initializeHopf, refreshHopf, detectHopf
 
 from .Types import Branch, Event
@@ -115,9 +115,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 		r_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
 		l_vectors = rng.normal(0.0, 1.0, (n_bifurcation_vectors, M+1))
 		l_vectors, r_vectors = _orthonormalize_lr(l_vectors, r_vectors, tangent)
-		prev_w_vectors = np.zeros_like(r_vectors)
-		prev_w_values = np.zeros(n_bifurcation_vectors)
-		prev_bf_x = np.copy(x)
+		prev_bf_state = initializeBifurcationDetection(x, l_vectors, r_vectors, n_bifurcation_vectors)
 
 	# Initialize Hopf detector if activated
 	if hopf_detection:
@@ -144,8 +142,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			nk_residual = lg.norm(F(x_new))
 			
 			# Check the residual to increase or decrease ds
-			good_residual = np.all(np.isfinite(nk_residual))
-			if good_residual and nk_residual <= 10.0 * nk_tolerance:
+			if np.all(np.isfinite(nk_residual)) and nk_residual <= 10.0 * nk_tolerance:
 				ds = min(1.2*ds, ds_max)
 				break
 			else:
@@ -175,15 +172,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 		# Do bifurcation detection in the new point (do extra check in case of a possible fold point)
 		if bifurcation_detection and n % 5 == 0:
-			w_vectors, w_values = test_fn_jacobian_multi(F, x_new, l_vectors, r_vectors, prev_w_vectors, sp)
+			curr_bf_state = test_fn_jacobian_multi(F, x_new, l_vectors, r_vectors, prev_bf_state, sp)
 
 			# Possible bifurcation point detected
-			bf_condition = (prev_w_values * w_values < 0.0) & (np.abs(w_values) < 1000.0) & (np.abs(prev_w_values) < 1000.0)
+			bf_condition = detectBifurcationPoint(prev_bf_state, curr_bf_state)
 			if np.any(bf_condition):
 				index = np.where(bf_condition)[0].min()
-				LOG.info(f'Sign change detected {prev_w_values} {w_values} {index}')
+				LOG.info(f'Sign change detected {prev_bf_state['w_values']} {curr_bf_state['w_values']} {index}')
 
-				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, prev_bf_x, x_new, l_vectors[index], r_vectors[index], w_vectors[index], M, sp)
+				is_bf_point, x_singular, alpha_singular = computeBifurcationPoint(F, prev_bf_state, curr_bf_state, l_vectors, r_vectors, index, M, sp)
 				if is_bf_point:
 					LOG.info(f'Bifurcation Point at {x_singular}')
 					s_singular = s + alpha_singular * (new_s - s)
@@ -193,10 +190,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 					return branch.trim(), termination_event
 				else:
 					LOG.info('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
-			
-			prev_w_vectors = w_vectors
-			prev_w_values = w_values
-			prev_bf_x = np.copy(x_new)
+			prev_bf_state = curr_bf_state
 
 		# Check whether we passed a fold point.
 		if new_tangent[M] * tangent[M] < 0.0 and n > 5:

@@ -4,15 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.4.0] - 2025-09-28
 
 ### Added
 - **Orthonormalizing** l- and r- vectors for bifurcation detection. Also projecting all l-vectors off the initial tangent.
 - **Multiple Bifurcation Test vectors** for more robust bifurcation detection.
 - **Hopf Bifurcation Detection** by keeping track of the few rightmost eigenvalues and updating with a Rayleigh iteration.
+- **Readme** now contains the normal Hopf example and the Hopf point in the Fitzhugh-Nagumo PDEs.
 
 ### Changed
 - **Bifurcation detection before fold detection** because BP has priority.
+- **Internal representations** of bifurcation detection states in advance of DetectionModules.
 
 ### Removed
 - **testfunctions.py** the bordered test for bifurcation points is already included in Bifurcation.py
