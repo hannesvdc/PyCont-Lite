@@ -204,7 +204,7 @@ x - \mu y - (x^2 + y^2) y &= 0 \\
 \end{align}
 $$
 
-which has a Hopf point at $(x,y) = (0,0)$ with $\mu = 0$. PyCont-Lite can find this Hopf bifurcation point:
+which has a Hopf point at $(x,y) = (0,0)$ with $\mu = 0$. PyCont-Lite can find this Hopf bifurcation point (see `examples/NormalHopf.py`):
 ```python
 import numpy as np
 import pycont
@@ -234,6 +234,56 @@ which produces the (trivial) bifurcation diagram
 </p>
 
 For now, Hopf bifurcation detection is disabled by default, so the user must supply it via `'hopf_detection' : True` in the solver parameters.
+
+### Advanced Hopf Example: The Fitzhugh-Nagumo PDEs
+For a more interesting system that exhibits a Hopf bifurcation, consider the Fitzhugh-Nagumo PDEs
+$$
+\begin{align}
+u_{xx} + u - u^3 - v = 0 \\
+\delta v_{xx} + \varepsilon \left(u - a_1 v - a_0\right) = 0
+\end{align}
+$$
+with $\delta = 4$, $a_1 = 2$ and $a_0 = -0.03$. This system exhibits a Hopf bifurcation point near $\varepsilon \approx 0.018$, 
+and a fold point near $\varepsilon \approx 0.94$. See `examples/FitzhughNagumoPDEs.py` for the code:
+
+```python
+N = 100
+L = 20.0
+x = np.linspace(0.0, L, N)
+dx = L / (N-1)
+
+# Build the FHN objective function through finite differences
+a0 = -0.03
+a1 = 2.0
+delta = 4.0
+def G(z : np.ndarray, eps : float):
+    u, v = z[:N], z[N:]
+    u_xx = laplace_neumann(u, dx)
+    v_xx = laplace_neumann(v, dx)
+    u_rhs = u_xx + u - u**3 - v
+    v_rhs = delta * v_xx + eps * (u - a1*v - a0)
+    return np.concatenate((u_rhs, v_rhs))
+
+# Do continuation.
+tolerance = 1e-9
+ds_max = 0.01
+ds_min = 1e-6
+ds0 = 1e-3
+n_steps = 1000
+solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
+continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters)
+
+# Plot the bifurcation diagram `eps` versus <u>
+u_transform = lambda z: np.average(z[:N])
+pycont.plotBifurcationDiagram(continuation_result, u_transform=u_transform, p_label=r'$\varepsilon$', u_label=r'$<u>$')
+```
+
+Note that we limit exploration to a minimal parameter value of $\varepsilon = 0.01$ for plotting purposes. PyCont-Lite detects the fold
+and Hopf points nicely
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/FHN.png" width="400">
+</p>
 
 ## Plotting Bifurcation Diagrams
 
