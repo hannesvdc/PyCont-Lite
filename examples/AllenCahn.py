@@ -35,7 +35,7 @@ def AllenCahnTest():
     ds0 = 1e-4
     n_steps = 500
     solver_parameters = {"tolerance" : tolerance, "param_min" : 0.22, "param_max" : 0.7}
-    continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='verbose')
+    continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
 
     # Plot the bifurcation diagram eps versus phi(x=-1)
     u_transform = lambda phi: phi[0]
