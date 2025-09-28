@@ -192,6 +192,49 @@ This reproduces the many bifurcation points as $\varepsilon \to 0$.
     <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/AllenCahn.png" width="400">
 </p>
 
+### Hopf Bifurcation
+Since version 0.4.0, PyCont-Lite is also able to detect Hopf bifurcations. A Hopf bifurcation occurs when two
+complex-conjugated eigenvalues of the Jacobian $G_u(u,p)$ cross the imaginary axis. The prototypical example
+is the Hopf normal form
+
+$$
+\begin{align}
+\mu x - y - (x^2 + y^2) x &= 0 \\
+x - \mu y - (x^2 + y^2) y &= 0 \\
+\end{align}
+$$
+
+which has a Hopf point at $(x,y) = (0,0)$ with $\mu = 0$. PyCont-Lite can find this Hopf bifurcation point:
+```python
+import numpy as np
+import pycont
+
+def G(u : np.ndarray, mu : float) -> np.ndarray:
+    x = u[0]; y = u[1]
+    Gx = mu*x - y - (x**2 + y**2) * x
+    Gy = x + mu*y - (x**2 + y**2) * y
+    return np.array([Gx, Gy])
+mu0 = -1.0
+u0 = np.array([0.0, 0.0])
+
+ds_max = 0.01
+ds_min = 1.e-6
+ds = 0.01
+n_steps = 200
+solver_parameters = {"tolerance": 1e-10, 'hopf_detection' : True}
+continuation_result = pycont.arclengthContinuation(G, u0, mu0, ds_min, ds_max, ds, n_steps, solver_parameters)
+
+pycont.plotBifurcationDiagram(continuation_result, p_label=r'$\mu$')
+```
+
+which produces the (trivial) bifurcation diagram
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/NormalHopf.png" width="400">
+</p>
+
+For now, Hopf bifurcation detection is disabled by default, so the user must supply it via `'hopf_detection' : True` in the solver parameters.
+
 ## Plotting Bifurcation Diagrams
 
 PyCont-Lite includes a helper function `plotBifurcationDiagram` for quick visualization. Stable segments are shown as solid lines and unstable segments as dashed lines, just like in AUTO/MATCONT.
