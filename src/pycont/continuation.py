@@ -2,7 +2,7 @@ import numpy as np
 import numpy.linalg as lg
 import scipy.optimize as opt
 
-from . import PseudoArclengthContinuation as pac
+from . import ArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
 from .Types import ContinuationResult, Event, InputError
@@ -10,28 +10,6 @@ from .Tangent import computeTangent
 from .Logger import LOG, Verbosity, configureLOG
 
 from typing import Callable, Optional, Dict, Any
-
-def _as_1d_float(x, name: str) -> np.ndarray:
-    try:
-        a = np.asarray(x, dtype=float)
-    except Exception as e:
-        raise InputError(f"{name} cannot be converted to a float array") from e
-    if a.ndim == 0:  # scalar -> length-1
-        a = a.reshape(1)
-    if a.ndim != 1:
-        raise InputError(f"{name} must be 1-D, got shape {a.shape}")
-    if not np.all(np.isfinite(a)):
-        raise InputError(f"{name} contains NaN/Inf")
-    return a
-
-def _as_scalar_float(x, name: str) -> float:
-    try:
-        v = float(x)
-    except Exception as e:
-        raise InputError(f"{name} must be a scalar float") from e
-    if not np.isfinite(v):
-        raise InputError(f"{name} is NaN/Inf")
-    return v
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,
@@ -117,8 +95,11 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # Parse and check the input state
     M = u0.size
-    u0 = _as_1d_float(u0, "u0")
-    p0 = _as_scalar_float(p0, "p0")
+    u0 = u0.flatten()
+    if not np.all(np.isfinite(u0)):
+        raise InputError(f"{u0} contains NaN/Inf")
+    if not np.isfinite(p0):
+        raise InputError(f"{p0} is NaN/Inf")
     G0 = G(u0, p0)
     if not np.all(np.isfinite(G0)):
         raise InputError(f"Initial function evaluation contains NaN or Inf {G0}.")
