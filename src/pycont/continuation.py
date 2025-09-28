@@ -115,36 +115,29 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     # Create the logger based on the user's verbosity requirement.
     configureLOG(verbosity=verbosity)
 
-    # Parse the input state
+    # Parse and check the input state
+    M = u0.size
     u0 = _as_1d_float(u0, "u0")
     p0 = _as_scalar_float(p0, "p0")
-    M = len(u0)
+    G0 = G(u0, p0)
+    if not np.all(np.isfinite(G0)):
+        raise InputError(f"Initial function evaluation contains NaN or Inf {G0}.")
+    if G0.size != u0.size:
+        raise InputError(f"Shape mismatch between u0 and G(u0, p0). Got shapes {u0.shape} and {G0.shape} respectively.")
     
     # Verify and set default the solver parameters
     sp = {} if solver_parameters is None else dict(solver_parameters)
     rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
-    sp.setdefault("bifurcation_detection", True)
+    if nk_maxiter <= 0:
+        raise InputError(f"nk_maxiter must be strictly positive. Got {nk_maxiter}.")
+    if tolerance <= 0.0:
+        raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     sp.setdefault("analyze_stability", True)
-    mode = sp.setdefault("initial_directions", "both").lower()
-    param_min = sp.setdefault("param_min", None)
-    param_max = sp.setdefault("param_max", None)
     sp.setdefault("seed", 12345)
-    n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-    hopf_detection = sp.setdefault("hopf_detection", False)
-    n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
-
-    # Perform basic checks on some parameters without raising an error
-    sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
-    LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
-
-    # Perform necessary chechs on the user's input
-    G0 = G(u0, p0)
-    if not np.all(np.isfinite(G0)):
-        raise InputError(f"Initial function evaluation contains NaN or Inf {G0}.")
-    if G0.size != u0.size:
-        raise InputError(f"Shape mismatch between u0 and G(u0, p0). Got shapes {u0.shape} and {G0.shape} respectively.")
+    
+    # Check continuation parameters
     if n_steps < 1 or int(n_steps) != n_steps:
         raise InputError(f"n_steps must be a positive integer, got {n_steps}")
     if ds_min <= 0 or ds_0 <= 0 or ds_max <= 0:
@@ -152,20 +145,32 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     if ds_max < ds_min:
         raise InputError("ds_max must be >= ds_min")
     ds_0 = float(np.clip(ds_0, ds_min, ds_max))
+
+    # Check min / max param limits  
+    param_min = sp.setdefault("param_min", None)
+    param_max = sp.setdefault("param_max", None)
     if param_min is not None and param_max is not None and param_min >= param_max:
         raise InputError("require param_min < param_max")
     if param_min is not None and p0 < param_min:
         raise InputError("p0 must be inside (param_min, param_max)")
     if param_max is not None and p0 > param_max:
         raise InputError("p0 must be inside (param_min, param_max)")
-    if nk_maxiter <= 0:
-        raise InputError(f"nk_maxiter must be strictly positive. Got {nk_maxiter}.")
-    if tolerance <= 0.0:
-        raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
-    if n_bifurcation_vectors < 0:
-        raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
-    if hopf_detection and M < 2:
-        raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
+
+    # Check bifurcation detection parameters, if enabled.
+    bifurcation_detection = sp.setdefault("bifurcation_detection", True)
+    if bifurcation_detection:
+        n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
+        if n_bifurcation_vectors < 0:
+            raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
+
+    # Check Hopf detection parameters, if enabled
+    hopf_detection = sp.setdefault("hopf_detection", False)
+    if hopf_detection:
+        if M < 2:
+            raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
+        n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
+        sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
+        LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
@@ -181,6 +186,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"Initial tangent contains NaN or Inf values {tangent}. Perhaps G(u0, p0) is not finite?")
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
+    mode = sp.setdefault("initial_directions", "both").lower()
     mode = mode.lower()
     if mode == "both" or tangent[M] == 0.0: # Edge case if we start on a fold point
         dirs = [tangent, -tangent]
