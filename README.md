@@ -237,12 +237,14 @@ For now, Hopf bifurcation detection is disabled by default, so the user must sup
 
 ### Advanced Hopf Example: The Fitzhugh-Nagumo PDEs
 For a more interesting system that exhibits a Hopf bifurcation, consider the Fitzhugh-Nagumo PDEs
+
 $$
 \begin{align}
 u_{xx} + u - u^3 - v = 0 \\
 \delta v_{xx} + \varepsilon \left(u - a_1 v - a_0\right) = 0
 \end{align}
 $$
+
 with $\delta = 4$, $a_1 = 2$ and $a_0 = -0.03$. This system exhibits a Hopf bifurcation point near $\varepsilon \approx 0.018$, 
 and a fold point near $\varepsilon \approx 0.94$. See `examples/FitzhughNagumoPDEs.py` for the code:
 
@@ -311,7 +313,7 @@ pycont.plotBifurcationDiagram(result, u_transform=lambda u: u.max())
 You can fine-tune the solver by passing a dictionary:
 ```python
 solver_parameters = {
-    "rdiff": 1e-8,              # finite-difference step
+    "rdiff": 6e-6,              # central finite-difference step
     "nk_maxiter": 20,           # Newton-Krylov iterations
     "tolerance": 1e-10,         # nonlinear tolerance
     "bifurcation_detection": True,
@@ -353,9 +355,9 @@ This makes it easy to explore and plot bifurcation diagrams programmatically.
 
 ## Planned Features
 The following features are under active consideration for future releases:
-- Hopf bifurcation detection
+- Hopf point localization
 - Limit cycle continuation
-- More stable bifurcation detection by employing two independent (but fast) tests
+- Complete backend-agnostic implementation
 
 ## License
 
