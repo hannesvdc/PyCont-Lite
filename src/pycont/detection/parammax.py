@@ -46,7 +46,10 @@ class ParamMaxDetectionModule(DetectionModule):
         objective = lambda u : self.G(u, self.param_max_value)
         rdiff = self.sp["rdiff"]
         tolerance = self.sp["tolerance"]
-        u_param_max = opt.newton_krylov(objective, u_guess, rdiff=rdiff, f_tol=tolerance)
+        try:
+            u_param_max = opt.newton_krylov(objective, u_guess, rdiff=rdiff, f_tol=tolerance)
+        except opt.NoConvergence as e:
+            u_param_max = e.args[0]
 
         # Return the full state at param_max
         return np.append(u_param_max, self.param_max_value)

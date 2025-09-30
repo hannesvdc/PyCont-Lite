@@ -54,19 +54,31 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             Maximum Newton-Krylov iterations per corrector.
         - "tolerance": float (default 1e-10)
             Nonlinear residual tolerance for convergence.
-        - "bifurcation_detection" : bool (default True)
-            Disabling bifurcation detection can significantly speed up continuation when there are no bifurcation points.
-        - "analyze_stability" : bool (default True)
-            By default, the real part of the leading eigenvalue of Gu is computed. Negative eigenvalue indicates a 
-            stable branch, and a positive eigenvalue means the branch is unstable. Stability analysis can be disabled
-            to speed up computations.
-        - "initial_directions" : str (default 'both')
+        - "seed" : int (default 12345)
+            The seed used to initialize the internal random number generator.
+         - "initial_directions" : str (default 'both')
             Choose whether to explore only increasing or decreasing parameter values by passing 'increase_p' or 
             'decrease_p' respectively. Default is 'both'.
         - "param_min" : float (default None)
             User-speficied minimal allowed parameter value. Continuation will not go lower than this limit.
         - "param_max" : float (default None)
             User-speficied maximal allowed parameter value. Continuation will not go higher than this limit.
+        - "bifurcation_detection" : bool (default True)
+            Disabling bifurcation detection can significantly speed up continuation when there are no bifurcation points.
+        - "n_bifurcation_vectors" : int (default min(3,M))
+            The number of bifurcation test functions used.
+        - "analyze_stability" : bool (default True)
+            By default, the real part of the leading eigenvalue of Gu is computed. Negative eigenvalue indicates a 
+            stable branch, and a positive eigenvalue means the branch is unstable. Stability analysis can be disabled
+            to speed up computations.
+        - "hopf_detection" : bool (default False)
+            Enable or disable Hopf bifurcation detection by tracking eigenvalues close to the imaginary axis.
+        - "n_hopf_eigenvalues" : int (default 6)
+            The number of eigenvalues to track. We assume that only a few eigenvalues are unstable, so tracking
+            those with largest real part (initialized by `scipy.eigs(which='LR')`) will reliably detect
+            a pair of complex conjugated eigenvalues crossing the imaginar axis. Increasing `n_hopf_eigenvalues` 
+            will improve test reliability but come at a computational cost. 
+
 
     verbosity : Verbosity or String or Int
         The level of verbosity required by the user. Can either be Verbosity.QUIET (1), Verbosity.INFO (2) or Verbosity.VERBOSE (3).
