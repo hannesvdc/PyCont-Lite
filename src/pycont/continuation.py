@@ -5,7 +5,8 @@ import scipy.optimize as opt
 from . import ArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
-from .Types import ContinuationResult, Event, InputError
+from .Types import ContinuationResult, Event
+from .exceptions import InputError
 from .Tangent import computeTangent
 from .Logger import LOG, Verbosity, configureLOG
 

@@ -2,7 +2,7 @@ import numpy as np
 import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
-from ..Types import InputError
+from ..exceptions import InputError
 
 from typing import Dict, Any
 
