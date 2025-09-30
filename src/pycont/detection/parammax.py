@@ -39,7 +39,10 @@ class ParamMaxDetectionModule(DetectionModule):
         return False
     
     def localize(self) -> np.ndarray:
-        alpha = (self.param_max_value - self.p_prev) / (self.p_new - self.p_prev)
+        if self.p_new == self.p_prev:
+            alpha = 0.0
+        else:
+            alpha = (self.param_max_value - self.p_prev) / (self.p_new - self.p_prev)
         u_guess = self.u_prev + alpha * (self.u_new - self.u_prev)
 
         # Use Newton-Krylov to determine the exact point on the branch where `p = param_max`.
