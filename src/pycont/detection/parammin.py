@@ -2,23 +2,45 @@ import numpy as np
 import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
+from ..Types import InputError
 
 from typing import Dict, Any
 
 class ParamMinDetectionModule(DetectionModule):
 
     def __init__(self,
+                 G : ObjectiveType,
+                 u0 : np.ndarray,
+                 p0 : float,
+                 sp : Dict[str, Any],
                  param_min_value : float) -> None:
-        super().__init__()
+        """
+        Initialize new detection module for the problem.
+
+        Parameters
+        ----------
+        G : Callable
+            The continuation objective function.
+        u0 : ndarray
+            The initial state on the branch
+        p0 : ndarray
+            The initial parameter value on the branch
+        sp : Optional Dict
+            The solver parameters.
+
+        Returns
+        -------
+        Nothing.
+        """
+        super().__init__(G, sp)
         self.param_min_value = param_min_value
 
-    def initializeBranch(self,
-                         G: ObjectiveType,
-                         x: np.ndarray,
-                         tangent: np.ndarray,
-                         sp: Dict[str, Any]) -> None:
-        super().initializeBranch(G, x, tangent, sp)
+        if self.param_min_value > p0:
+            raise InputError(f"p0 cannot be smaller than para_min, got {p0} and {self.param_min_value}")
 
+    def initializeBranch(self,
+                         x: np.ndarray,
+                         tangent: np.ndarray) -> None:
         self.M = len(x) - 1
         self.u_prev = x[:self.M]
         self.p_prev = x[self.M]
@@ -26,12 +48,12 @@ class ParamMinDetectionModule(DetectionModule):
     def update(self,
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
-         # Update the internal state
+        # Update the internal state
         self.u_new = x_new[:self.M]
         self.p_new = x_new[self.M]
 
         # Return true if we passed `param_max`. Otherwise update the internal state.
-        if self.p_new <= self.param_min_value and self.p_prev > self.param_min_value:
+        if self.p_new < self.param_min_value and self.p_prev >= self.param_min_value:
             return True
         
         self.u_prev = self.u_new

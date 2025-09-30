@@ -144,10 +144,6 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     param_max = sp.setdefault("param_max", None)
     if param_min is not None and param_max is not None and param_min >= param_max:
         raise InputError("require param_min < param_max")
-    if param_min is not None and p0 < param_min:
-        raise InputError("p0 must be inside (param_min, param_max)")
-    if param_max is not None and p0 > param_max:
-        raise InputError("p0 must be inside (param_min, param_max)")
 
     # Check bifurcation detection parameters, if enabled.
     bifurcation_detection = sp.setdefault("bifurcation_detection", True)

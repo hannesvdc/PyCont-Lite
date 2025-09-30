@@ -7,26 +7,16 @@ ObjectiveType = Callable[[np.ndarray, float], np.ndarray]
 
 class DetectionModule(abc.ABC):
 
-    def __init__(self):
-        pass
-
-    def initializeBranch(self,
-                         G : ObjectiveType,
-                         x : np.ndarray,
-                         tangent : np.ndarray,
-                         sp : Dict[str, Any]) -> None:
+    def __init__(self,
+                 G : ObjectiveType,
+                 sp : Dict[str, Any]):
         """
-        Initialize detection on a new branch. This function should reset all fields
-        within the DetectionModule subclass.
+        Initialize new detection module for the problem.
 
         Parameters
         ----------
         G : Callable
             The continuation objective function.
-        x : ndarray
-            The initial point on the branch
-        tangent : ndarray
-            The tangent to the branch at the inital point.
         sp : Optional Dict
             The solver parameters.
 
@@ -36,6 +26,26 @@ class DetectionModule(abc.ABC):
         """
         self.G = G
         self.sp = {} if sp is None else dict(sp)
+
+    @abc.abstractmethod
+    def initializeBranch(self,
+                         x : np.ndarray,
+                         tangent : np.ndarray) -> None:
+        """
+        Initialize detection on a new branch. This function should reset all fields
+        within the DetectionModule subclass.
+
+        Parameters
+        ----------
+        x : ndarray
+            The initial point on the branch
+        tangent : ndarray
+            The tangent to the branch at the inital point.
+
+        Returns
+        -------
+        Nothing.
+        """
 
     @abc.abstractmethod
     def update(self,

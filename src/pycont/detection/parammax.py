@@ -2,23 +2,27 @@ import numpy as np
 import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
+from ..Types import InputError
 
 from typing import Dict, Any
 
 class ParamMaxDetectionModule(DetectionModule):
 
     def __init__(self,
+                 G: ObjectiveType,
+                 u0 : np.ndarray,
+                 p0 : float,
+                 sp: Dict[str, Any],
                  param_max_value : float) -> None:
-        super().__init__()
+        super().__init__(G, sp)
         self.param_max_value = param_max_value
 
-    def initializeBranch(self,
-                         G: ObjectiveType,
-                         x: np.ndarray,
-                         tangent: np.ndarray,
-                         sp: Dict[str, Any]) -> None:
-        super().initializeBranch(G, x, tangent, sp)
+        if self.param_max_value > p0:
+            raise InputError(f"p0 cannot be smaller than para_min, got {p0} and {self.param_max_value}")
 
+    def initializeBranch(self,
+                         x: np.ndarray,
+                         tangent: np.ndarray) -> None:
         self.M = len(x) - 1
         self.u_prev = x[:self.M]
         self.p_prev = x[self.M]
@@ -31,7 +35,7 @@ class ParamMaxDetectionModule(DetectionModule):
         self.p_new = x_new[self.M]
 
         # Return true if we passed `param_max`. Otherwise update the internal state.
-        if self.p_new >= self.param_max_value and self.p_prev < self.param_max_value:
+        if self.p_new > self.param_max_value and self.p_prev <= self.param_max_value:
             return True
         
         self.u_prev = self.u_new
