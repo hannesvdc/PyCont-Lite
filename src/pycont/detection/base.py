@@ -1,7 +1,7 @@
 import numpy as np
 
 import abc
-from typing import Callable, Dict, Any
+from typing import Callable, Dict, Any, Optional
 
 ObjectiveType = Callable[[np.ndarray, float], np.ndarray]
 
@@ -56,6 +56,7 @@ class DetectionModule(abc.ABC):
 
     @abc.abstractmethod
     def update(self,
+               F : Callable[[np.ndarray], np.ndarray],
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
         """
@@ -64,6 +65,8 @@ class DetectionModule(abc.ABC):
 
         Parameters
         ----------
+        F : Callable
+            Extended objective function.
         x_new : ndarray
             The new point on the branch.
         tangent_new : ndarray
@@ -77,7 +80,7 @@ class DetectionModule(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def localize(self) -> np.ndarray:
+    def localize(self) -> Optional[np.ndarray]:
         """
         Localize the special point to high precision.
 

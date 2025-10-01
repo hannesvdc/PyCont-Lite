@@ -23,6 +23,7 @@ class FoldDetectionModule(DetectionModule):
         self.prev_tangent = np.copy(tangent)
 
     def update(self,
+               F : Callable[[np.ndarray], np.ndarray],
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
         self.new_x = np.copy(x_new)
@@ -36,7 +37,7 @@ class FoldDetectionModule(DetectionModule):
         self.prev_tangent = self.new_tangent
         return False
 
-    def localize(self) -> np.ndarray:
+    def localize(self) -> Optional[np.ndarray]:
         """
         Localizes the bifurcation point between x_start and x_end using the bisection method.
 
@@ -84,7 +85,7 @@ class FoldDetectionModule(DetectionModule):
             LOG.info(f'BrentQ edge values {finalTangentComponent(-2.0)},  {finalTangentComponent(2.0)}')
             alpha_fold, result = opt.brentq(finalTangentComponent, -2.0, 2.0, full_output=True, disp=False)
         except ValueError: # No sign change detected
-            return self.new_x
+            return None
 
         x_fold = self.prev_x + alpha_fold * (self.new_x - self.prev_x)
         return x_fold

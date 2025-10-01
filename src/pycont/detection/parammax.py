@@ -4,7 +4,7 @@ import scipy.optimize as opt
 from .base import DetectionModule, ObjectiveType
 from ..exceptions import InputError
 
-from typing import Dict, Any
+from typing import Dict, Any, Callable, Optional
 
 class ParamMaxDetectionModule(DetectionModule):
 
@@ -27,6 +27,7 @@ class ParamMaxDetectionModule(DetectionModule):
         self.p_prev = x[self.M]
     
     def update(self,
+               F : Callable[[np.ndarray], np.ndarray],
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
         # Update the internal state
@@ -41,7 +42,7 @@ class ParamMaxDetectionModule(DetectionModule):
         self.p_prev = self.p_new
         return False
     
-    def localize(self) -> np.ndarray:
+    def localize(self) -> Optional[np.ndarray]:
         if self.p_new == self.p_prev:
             alpha = 0.0
         else:
