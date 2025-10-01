@@ -9,6 +9,8 @@ class DetectionModule(abc.ABC):
 
     def __init__(self,
                  G : ObjectiveType,
+                 u0 : np.ndarray,
+                 p0 : float,
                  sp : Dict[str, Any]):
         """
         Initialize new detection module for the problem.
@@ -17,6 +19,10 @@ class DetectionModule(abc.ABC):
         ----------
         G : Callable
             The continuation objective function.
+        u0 : ndarray
+            Numerical continuation starting point
+        p0 : float
+            Numerical continuation starting parameter value
         sp : Optional Dict
             The solver parameters.
 
@@ -25,6 +31,7 @@ class DetectionModule(abc.ABC):
         Nothing.
         """
         self.G = G
+        self.M = len(u0)
         self.sp = {} if sp is None else dict(sp)
 
     @abc.abstractmethod

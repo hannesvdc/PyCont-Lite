@@ -45,11 +45,11 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
     return tangent
 
 def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
-					  x_left : np.ndarray,
-					  x_right : np.ndarray,
-					  tangent_ref : np.ndarray,
-					  ds : float,
-					  sp : Dict) -> Tuple[bool, np.ndarray, float]:
+					 x_left : np.ndarray,
+					 x_right : np.ndarray,
+					 tangent_ref : np.ndarray,
+					 ds : float,
+					 sp : Dict) -> Tuple[bool, np.ndarray, float]:
 	"""
 	Localizes the bifurcation point between x_start and x_end using the bisection method.
 

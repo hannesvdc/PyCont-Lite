@@ -14,7 +14,7 @@ class ParamMaxDetectionModule(DetectionModule):
                  p0 : float,
                  sp: Dict[str, Any],
                  param_max_value : float) -> None:
-        super().__init__(G, sp)
+        super().__init__(G, u0, p0, sp)
         self.param_max_value = param_max_value
 
         if self.param_max_value > p0:
@@ -23,7 +23,6 @@ class ParamMaxDetectionModule(DetectionModule):
     def initializeBranch(self,
                          x: np.ndarray,
                          tangent: np.ndarray) -> None:
-        self.M = len(x) - 1
         self.u_prev = x[:self.M]
         self.p_prev = x[self.M]
     

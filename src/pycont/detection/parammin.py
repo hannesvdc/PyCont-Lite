@@ -32,7 +32,7 @@ class ParamMinDetectionModule(DetectionModule):
         -------
         Nothing.
         """
-        super().__init__(G, sp)
+        super().__init__(G, u0, p0, sp)
         self.param_min_value = param_min_value
 
         if self.param_min_value > p0:
@@ -41,7 +41,6 @@ class ParamMinDetectionModule(DetectionModule):
     def initializeBranch(self,
                          x: np.ndarray,
                          tangent: np.ndarray) -> None:
-        self.M = len(x) - 1
         self.u_prev = x[:self.M]
         self.p_prev = x[self.M]
     
