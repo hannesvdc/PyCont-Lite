@@ -2,11 +2,11 @@ import numpy as np
 import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
-from ..Logger import LOG
+from ._bifurcation import test_fn_jacobian_multi, computeBifurcationPoint
 from ..exceptions import InputError
 
 from dataclasses import dataclass
-from typing import Dict, Callable, Any, Tuple, Optional
+from typing import Dict, Callable, Any, Optional
 
 @dataclass
 class BifurcationState:
@@ -51,6 +51,17 @@ class BifurcationDetectionModule(DetectionModule):
     def initializeBranch(self,
                          x : np.ndarray,
                          tangent : np.ndarray) -> None:
+        """
+        Initialize the Bifurcation detection toolkit by creating the first (empty)
+        bifurcation state.
+
+        Parameters
+        ----------
+        x : ndarray
+            The (typically) initial point on the branch.
+        tangent : ndarray
+            The tangent to the initial point.
+        """
         
         # Sample the l- and r-vectors for this test function.
         rng = np.random.RandomState(seed=self.sp["seed"])
@@ -69,12 +80,7 @@ class BifurcationDetectionModule(DetectionModule):
                tangent_new : np.ndarray) -> bool:
 
         # Calculate the test function for every l- and r-vector
-        w_vectors = np.zeros_like(self.prev_state.w_vectors)
-        w_values = np.zeros_like(self.prev_state.w_values)
-        for index in range(len(w_values)):
-            w_i, value_i = self.test_fn_jacobian(F, x_new, index)
-            w_vectors[index,:] = w_i
-            w_values[index] = value_i
+        w_values, w_vectors = test_fn_jacobian_multi(F, x_new, self.l_vectors, self.r_vectors, self.prev_state.w_vectors, self.sp)
         self.new_state = BifurcationState(np.copy(x_new), np.copy(tangent_new), w_values, w_vectors)
 
         # Test for a bifurcation point
@@ -87,79 +93,18 @@ class BifurcationDetectionModule(DetectionModule):
         self.prev_state = self.new_state
         return False
     
-    def test_fn_jacobian(self, 
-                         F : Callable[[np.ndarray], np.ndarray], 
-					     x : np.ndarray,
-                         index : int) -> Tuple[np.ndarray, float]:
-        # Gather required state
-        rdiff = self.sp["rdiff"]
-        r = self.r_vectors[index,:]
-        w_prev = self.prev_state.w_vectors[index,:]
-
-        def matvec(w):
-            norm_w = np.linalg.norm(w)
-            if norm_w == 0.0:
-                return -r
-            eps = rdiff / norm_w
-            return (F(x + eps * w) - F(x - eps * w)) / (2.0*eps) - r
-
-        # Compute test-function value
-        with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-            w_solution = opt.newton_krylov(matvec, w_prev, rdiff=rdiff, verbose=False)
-        residual = np.linalg.norm(matvec(w_solution))
-        beta = -1.0 / np.dot(self.l_vectors[index,:], w_solution)
-        LOG.verbose(f'Jacobian test FN = {beta}, residual = {residual}')
-
-        # return the full vector and the test function value
-        return w_solution, beta
-    
     def localize(self) -> Optional[np.ndarray]:
-        rdiff = self.sp["rdiff"]
-
-        # Gather the required state
-        x_start = self.prev_state.x
-        x_end = self.new_state.x
         index = np.argwhere(self.prev_state.w_values * self.new_state.w_values < 0.0)[0]
-        w_vector = self.new_state.w_vectors[index, :]
-        r = self.r_vectors[index,:]
-        l = self.l_vectors[index,:]
+        is_bf, x_bf, alpha_bf = computeBifurcationPoint(self.F_bf, 
+                                                        self.prev_state.x, 
+                                                        self.new_state.x, 
+                                                        self.l_vectors, 
+                                                        self.r_vectors, 
+                                                        self.prev_state.w_vectors, 
+                                                        index, 
+                                                        self.M, 
+                                                        self.sp)
 
-        # Initial condition for Newton
-        x_diff = x_end - x_start
-        S = np.dot(l, w_vector)
-        z0 = np.append(w_vector / S, -1.0 / S)
-
-        # Build the Bisection Objective Function
-        def BFObjective(alpha : float) -> float:
-            x = x_start + alpha * x_diff
-            
-            # Build the linear system
-            rhs = np.zeros(self.M+2); rhs[self.M+1] = 1.0
-            def bordered_matvec(w : np.ndarray) -> np.ndarray: 
-                z = w[0:self.M+1]; beta = w[self.M+1]
-                Jz = (self.F_bf(x + rdiff*z) - self.F_bf(x - rdiff*z)) / (2*rdiff)
-                J_eq = Jz + beta * r
-                l_eq = np.dot(l, z)
-                return np.append(J_eq, [l_eq]) - rhs
-
-            # Solve the linear system to obtain beta = z_solution[-1]
-            with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-                z_solution = opt.newton_krylov(bordered_matvec, z0, rdiff=rdiff)
-            LOG.verbose(f'Linear Bifurcation residual {np.linalg.norm(bordered_matvec(z_solution))}')
-            beta = z_solution[self.M+1]
-
-            return beta
-        
-        # Solve beta = 0. This is the location of the bifurcation point.
-        try:
-            LOG.verbose(f'BrentQ edge values {BFObjective(0.0)},  {BFObjective(1.0)}')
-            alpha_singular, result = opt.brentq(BFObjective, 0.0, 1.0, full_output=True, disp=False)
-        except ValueError: # No sign change detected
-            LOG.verbose('Value error caught')
-            return None
-        except opt.NoConvergence:
-            LOG.verbose('NoConvergence error caught')
-            return None
-        x_singular = x_start + alpha_singular * x_diff
-
-        return x_singular
+        if is_bf:
+            return x_bf
+        return None
