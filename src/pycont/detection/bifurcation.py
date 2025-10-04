@@ -1,5 +1,4 @@
 import numpy as np
-import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
 from ._bifurcation import test_fn_jacobian_multi, computeBifurcationPoint

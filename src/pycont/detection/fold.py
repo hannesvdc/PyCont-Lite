@@ -1,9 +1,7 @@
 import numpy as np
-import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
 from ._fold import computeFoldPoint
-from ..Logger import LOG
 
 from typing import Dict, Callable, Any, Optional
 
