@@ -4,6 +4,7 @@ from .parammin import ParamMinDetectionModule
 from .parammax import ParamMaxDetectionModule
 from .fold import FoldDetectionModule
 from .bifurcation import BifurcationDetectionModule
+from .hopf import HopfDetectionModule
 
 __all__ = [
     "DetectionModule",
@@ -11,4 +12,5 @@ __all__ = [
     "ParamMaxDetectionModule",
     "FoldDetectionModule",
     "BifurcationDetectionModule",
+    "HopfDetectionModule",
 ]
