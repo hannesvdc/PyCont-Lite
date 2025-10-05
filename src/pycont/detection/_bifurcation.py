@@ -136,10 +136,10 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     """
     rdiff = sp["rdiff"]
 
-    x_diff = x_left - x_right
+    x_diff = x_right - x_left
     l = l_vectors[index]
     r = r_vectors[index]
-    w = w_vectors_left[index,:]
+    w = w_vectors_left[index]
     if len(w) == M+1:
         S = np.dot(l, w)
         z0 = np.append(w / S, -1.0 / S)

@@ -35,7 +35,7 @@ class DetectionModule(abc.ABC):
         -------
         Nothing.
         """
-        self.kind = kind
+        self.kind : EventKind = kind
 
         self.G = G
         self.M = len(u0)

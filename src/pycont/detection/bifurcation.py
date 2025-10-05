@@ -2,6 +2,7 @@ import numpy as np
 
 from .base import DetectionModule, ObjectiveType
 from ._bifurcation import test_fn_jacobian_multi, computeBifurcationPoint
+from ..Logger import LOG
 from ..exceptions import InputError
 
 from dataclasses import dataclass
@@ -84,7 +85,9 @@ class BifurcationDetectionModule(DetectionModule):
 
         # Test for a bifurcation point
         is_bf =  (w_values * self.prev_state.w_values < 0.0) & (np.abs(self.prev_state.w_values) < 1000.0) & (np.abs(w_values) < 1000.0)
-        if is_bf:
+        if np.any(is_bf):
+            index = np.where(is_bf)[0].min()
+            LOG.info(f'Sign change detected {self.prev_state.w_values} {self.new_state.w_values} {index}')
             self.F_bf = F
             return True
         
@@ -93,7 +96,7 @@ class BifurcationDetectionModule(DetectionModule):
         return False
     
     def localize(self) -> Optional[np.ndarray]:
-        index = np.argwhere(self.prev_state.w_values * self.new_state.w_values < 0.0)[0]
+        index = np.argwhere(self.prev_state.w_values * self.new_state.w_values < 0.0)[0].min()
         is_bf, x_bf, alpha_bf = computeBifurcationPoint(self.F_bf, 
                                                         self.prev_state.x, 
                                                         self.new_state.x, 
@@ -103,7 +106,10 @@ class BifurcationDetectionModule(DetectionModule):
                                                         index, 
                                                         self.M, 
                                                         self.sp)
-
         if is_bf:
+            LOG.info(f'Bifurcation Point at {x_bf}')
             return x_bf
+        
+        LOG.info('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
+        self.prev_state = self.new_state
         return None

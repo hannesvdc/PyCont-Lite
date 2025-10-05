@@ -5,12 +5,13 @@ import scipy.optimize as opt
 from . import ArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
+from .detection import *
 from .Types import ContinuationResult, Event
 from .exceptions import InputError
 from .Tangent import computeTangent
 from .Logger import LOG, Verbosity, configureLOG
 
-from typing import Callable, Optional, Dict, Any
+from typing import Callable, Optional, Dict, Any, List
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,
@@ -140,27 +141,36 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError("ds_max must be >= ds_min")
     ds_0 = float(np.clip(ds_0, ds_min, ds_max))
 
-    # Check min / max param limits  
+    # Construct all detection modules
+    detectionModules = []
     param_min = sp.setdefault("param_min", None)
+    if param_min is not None:
+        detectionModules.append(ParamMinDetectionModule(G, u0, p0, sp, param_min))
     param_max = sp.setdefault("param_max", None)
+    if param_max is not None:
+        detectionModules.append(ParamMaxDetectionModule(G, u0, p0, sp, param_max))
     if param_min is not None and param_max is not None and param_min >= param_max:
-        raise InputError("require param_min < param_max")
+        raise InputError(f"Require param_min < param_max, got {param_min} and {param_max}")
 
     # Check bifurcation detection parameters, if enabled.
     bifurcation_detection = sp.setdefault("bifurcation_detection", True)
     if bifurcation_detection:
-        n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-        if n_bifurcation_vectors < 0:
-            raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
+        detectionModules.append(BifurcationDetectionModule(G, u0, p0, sp))
+    #if bifurcation_detection:
+    #    n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
+    #    if n_bifurcation_vectors < 0:
+    #        raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
 
     # Check Hopf detection parameters, if enabled
     hopf_detection = sp.setdefault("hopf_detection", False)
     if hopf_detection:
-        if M < 2:
-            raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
-        n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
-        sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
-        LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
+        detectionModules.append(HopfDetectionModule(G, u0, p0, sp))
+    #if hopf_detection:
+    #    if M < 2:
+    #        raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
+    #    n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
+    #    sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
+    #    LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
@@ -174,6 +184,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     tangent = computeTangent(G, u0, p0, initial_tangent, sp)
     if not np.all(np.isfinite(tangent)):
         raise InputError(f"Initial tangent contains NaN or Inf values {tangent}. Perhaps G(u0, p0) is not finite?")
+    detectionModules.append(FoldDetectionModule(G, u0, p0, sp))
 
     # Make a list of which directions to explore (increase_p, decrease_p or both)
     mode = sp.setdefault("initial_directions", "both").lower()
@@ -202,7 +213,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     starting_event = Event("SP", u0, p0, 0.0)
     result.events.append(starting_event)
     for t0 in dirs:
-        _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, result)
+        _recursiveContinuation(G, u0, p0, t0, ds_min, ds_max, ds_0, n_steps, sp, 0, detectionModules, result)
 
     # Return all found branches and bifurcation points
     return result
@@ -217,6 +228,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                            n_steps : int, 
                            sp : Dict[str, Any],
                            from_event : int,
+                           detectionModules : List[DetectionModule],
                            result : ContinuationResult) -> None:
     """
     Internal function that performs pseudo-arclength continuation on the current branch. When the
@@ -247,6 +259,8 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         Additional paramters for PyCont.
     from_event : int
         Index of the event that spawned this event (initially a starting point with index 0).
+    detectionModules : List[DetectionModule]
+        The list of active detection modules for this continuation stage.
     result: ContinuationResult
         Object that contains all continued branches and detected bifurcation points.
 
@@ -259,7 +273,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     M = len(u0)
     
     # Do regular continuation on this branch
-    branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, sp)
+    branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, detectionModules, sp)
     branch.from_event = from_event
     result.branches.append(branch)
     result.events.append(termination_event)
@@ -278,7 +292,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         u_final = termination_event.u
         p_final = termination_event.p
         final_tangent = termination_event.info["tangent"]
-        _recursiveContinuation(G, u_final, p_final, final_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+        _recursiveContinuation(G, u_final, p_final, final_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
 
     # If there is a bifurcation point on this path, do branch switching
     elif termination_event.kind == "BP":
@@ -303,10 +317,10 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         for n in range(len(directions)):
             x0 = directions[n]
             tangent = computeTangent(G, x0[0:M], x0[M], tangents[n], sp)
-            _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            _recursiveContinuation(G, x0[0:M], x0[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
 
     # If we ended on a Hopf point, calculate the limit cycle and continue both.
     elif termination_event.kind == "HB":
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
-        _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+        _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)

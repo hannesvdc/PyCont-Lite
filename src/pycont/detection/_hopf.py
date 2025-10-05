@@ -53,6 +53,7 @@ def _filterComplexConjugated(eigvals: np.ndarray,
 def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
                    u : np.ndarray,
                    p : float,
+                   m_eigs : int,
                    sp: Dict) -> Tuple[np.ndarray, np.ndarray, int]:
     """
     Initialize the Hopf Bifurcation Detection Method by generating the eigenvalues 
@@ -69,6 +70,8 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The current state vector on the path.
     p : float
         The current parameter value.
+    m_eigs : int
+        The number of Hopf eigenvalues to track.
     sp : Dict
         Solver parameters including arguments `keep_r` and `m_target`.
 
@@ -82,7 +85,6 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The index of the leading eigenvalue - the one closest to the imaginary axis.
     """
     LOG.verbose(f"Initializing Hopf")
-    m_eigs = sp["n_hopf_eigenvalues"]
     omega_min = 1e-3
 
     # Create JVP

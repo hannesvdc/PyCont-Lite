@@ -2,8 +2,15 @@ import numpy as np
 
 from .base import DetectionModule, ObjectiveType
 from ._fold import computeFoldPoint
+from ..Logger import LOG
 
+from dataclasses import dataclass
 from typing import Dict, Callable, Any, Optional
+
+@dataclass
+class FoldState:
+    x : np.ndarray
+    tangent : np.ndarray
 
 class FoldDetectionModule(DetectionModule):
 
@@ -17,26 +24,27 @@ class FoldDetectionModule(DetectionModule):
     def initializeBranch(self,
                          x : np.ndarray,
                          tangent : np.ndarray) -> None:
-        self.prev_x = np.copy(x)
-        self.prev_tangent = np.copy(tangent)
+        self.prev_state = FoldState(np.copy(x), np.copy(tangent))
 
     def update(self,
                F : Callable[[np.ndarray], np.ndarray],
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
-        self.new_x = np.copy(x_new)
-        self.new_tangent = np.copy(tangent_new)
+        self.new_state = FoldState(np.copy(x_new), np.copy(tangent_new))
 
-        if self.new_tangent[self.M] * self.prev_tangent[self.M] < 0.0:
+        if self.new_state.tangent[self.M] * self.prev_state.tangent[self.M] < 0.0:
             return True
         
         # Update the internal state
-        self.prev_x = self.new_x
-        self.prev_tangent = self.new_tangent
+        self.prev_state = self.new_state
         return False
 
     def localize(self) -> Optional[np.ndarray]:
-        is_fold, x_fold, _ = computeFoldPoint(self.G, self.prev_x, self.new_x, self.prev_tangent, self.sp)
+        is_fold, x_fold, _ = computeFoldPoint(self.G, self.prev_state.x, self.new_state.x, self.prev_state.tangent, self.sp)
         if is_fold:
+            LOG.info(f'Fold point at {x_fold}')
             return x_fold
+        
+        LOG.info('Erroneous Fold Point detection due to blow-up in tangent vector.')
+        self.prev_state = self.new_state
         return None

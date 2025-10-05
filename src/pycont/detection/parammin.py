@@ -2,6 +2,7 @@ import numpy as np
 import scipy.optimize as opt
 
 from .base import DetectionModule, ObjectiveType
+from ..Logger import LOG
 from ..exceptions import InputError
 
 from typing import Dict, Any, Callable, Optional
@@ -36,7 +37,7 @@ class ParamMinDetectionModule(DetectionModule):
         self.param_min_value = param_min_value
 
         if self.param_min_value > p0:
-            raise InputError(f"p0 cannot be smaller than para_min, got {p0} and {self.param_min_value}")
+            raise InputError(f"p0 cannot be smaller than param_min, got {p0} and {self.param_min_value}")
 
     def initializeBranch(self,
                          x: np.ndarray,
@@ -54,6 +55,7 @@ class ParamMinDetectionModule(DetectionModule):
 
         # Return true if we passed `param_max`. Otherwise update the internal state.
         if self.p_new < self.param_min_value and self.p_prev >= self.param_min_value:
+            LOG.info(f'Stopping Continuation Along this Branch. PARAM_MIN {self.param_min_value} reached.')
             return True
         
         self.u_prev = self.u_new
