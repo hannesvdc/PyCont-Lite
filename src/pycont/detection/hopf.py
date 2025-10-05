@@ -5,7 +5,14 @@ from ..Logger import LOG
 from ..exceptions import InputError
 from ._hopf import initializeHopf, refreshHopf, detectHopf
 
+from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
+
+@dataclass
+class HopfState:
+    eigvals : np.ndarray
+    eigvecs : np.ndarray
+    lead : int
 
 class HopfDetectionModule(DetectionModule):
 
@@ -25,22 +32,24 @@ class HopfDetectionModule(DetectionModule):
                          x : np.ndarray,
                          tangent : np.ndarray) -> None:
         self.prev_x = np.copy(x)
-        self.prev_hopf_state = initializeHopf(self.G, x[0:self.M], x[self.M], self.sp)
+        eigvals, eigvecs, lead = initializeHopf(self.G, x[0:self.M], x[self.M], self.sp)
+        self.prev_state = HopfState(eigvals, eigvecs, lead)
 
     def update(self,
                F : Callable[[np.ndarray], np.ndarray],
                x_new : np.ndarray,
                tangent_new : np.ndarray) -> bool:
         self.new_x = np.copy(x_new)
-        self.new_hopf_state = refreshHopf(self.G, x_new[0:self.M], x_new[self.M], self.prev_hopf_state, self.sp)
+        eigvals, eigvecs, lead = refreshHopf(self.G, x_new[0:self.M], x_new[self.M], self.prev_state.eigvals, self.prev_state.eigvecs, self.sp)
+        self.new_state = HopfState(eigvals, eigvecs, lead)
 
         # If we passed a Hopf point, return True for localization.
-        if detectHopf(self.prev_hopf_state, self.new_hopf_state):
+        if detectHopf(self.prev_state.eigvals, self.new_state.eigvecs, self.prev_state.lead, self.new_state.lead):
             return True
         
         # Else, update the internal state
         self.prev_x = self.new_x
-        self.prev_hopf_state = self.new_hopf_state
+        self.prev_state = self.new_state
         return False
     
     def localize(self) -> Optional[np.ndarray]:

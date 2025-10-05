@@ -107,6 +107,7 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
     if lead != -1 and np.abs(np.real(eigvals[lead])) < 1e-10:
         eigvals[lead] = 1j * np.imag(eigvals[lead])
     LOG.verbose(f'eigvals{eigvals}')
+
     omega = float(abs(eigvals[lead].imag)) if lead != -1 else 0.0
     state = {
         "eig_vals" : eigvals, "eig_vecs" : V, "lead" : lead, "omega" : omega
