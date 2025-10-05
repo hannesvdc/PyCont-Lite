@@ -102,7 +102,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     - The method is robust for smooth solution branches but may require
       tuning of `tolerance` and `ds_min` for problems with sharp turns
       or bifurcations.
-    - Ensure u0 is a converged solution of G(u, p0)=0 for best reliability.
+    - Ensure u0 is a converged solution of `G(u, p0) = 0` for best reliability.
     """
     # Create the logger based on the user's verbosity requirement.
     configureLOG(verbosity=verbosity)
@@ -152,25 +152,13 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     if param_min is not None and param_max is not None and param_min >= param_max:
         raise InputError(f"Require param_min < param_max, got {param_min} and {param_max}")
 
-    # Check bifurcation detection parameters, if enabled.
+    # Build Bifurcaiton and Hopf detection modules
     bifurcation_detection = sp.get("bifurcation_detection", True)
     if bifurcation_detection:
         detectionModules.append(BifurcationDetectionModule(G, u0, p0, sp))
-    #if bifurcation_detection:
-    #    n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, M))
-    #    if n_bifurcation_vectors < 0:
-    #        raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
-
-    # Check Hopf detection parameters, if enabled
     hopf_detection = sp.get("hopf_detection", False)
     if hopf_detection:
         detectionModules.append(HopfDetectionModule(G, u0, p0, sp))
-    #if hopf_detection:
-    #    if M < 2:
-    #        raise InputError(f"Can't do Hopf detection on one-dimensional systems.")
-    #    n_hopf_eigenvalues = sp.setdefault("n_hopf_eigenvalues", 6)
-    #    sp["n_hopf_eigenvalues"] = min(n_hopf_eigenvalues, M)
-    #    LOG.verbose(f'Hopf detector {sp["n_hopf_eigenvalues"]}.')
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')

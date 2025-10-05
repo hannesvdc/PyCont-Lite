@@ -54,7 +54,7 @@ def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 		return tangent[M]
 	
 	try:
-		LOG.info(f'BrentQ edge values {finalTangentComponent(-1.0)},  {finalTangentComponent(2.0)}')
+		LOG.verbose(f'BrentQ edge values {finalTangentComponent(-1.0)},  {finalTangentComponent(2.0)}')
 		alpha_fold, result = opt.brentq(finalTangentComponent, -2.0, 2.0, full_output=True, disp=False)
 	except ValueError: # No sign change detected
 		return False, x_right, 1.0
