@@ -8,6 +8,15 @@ from typing import Callable, Dict, Any, Optional
 ObjectiveType = Callable[[np.ndarray, float], np.ndarray]
 
 class DetectionModule(abc.ABC):
+    """
+    Abstract base class for all detection modules. Each detection module should implement
+    three methods
+    - `initializeBranch(x, tangent)` : Calculate the initial state on a new branch given the initial point and its tangent.
+    - `update(F, x_new, tangent_new)` : Update the internal state at `x_new` and return whether a special point was passed.
+                                        Here, `F` is the extended objective
+    - `localize()` : Compute the special (i.e. fold, bifurcation, ...) point up to the tolerance. 
+                     Call signature might be subject to change.
+    """
 
     def __init__(self,
                  kind : EventKind,

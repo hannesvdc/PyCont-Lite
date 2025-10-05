@@ -13,7 +13,11 @@ class FoldState:
     tangent : np.ndarray
 
 class FoldDetectionModule(DetectionModule):
+    """
+    Fold Detection Module that keeps track of the final component of tangent to the branch.
+    Fold detection is done in `update`, but fold localization is implemented in _fold.py.
 
+    """
     def __init__(self,
                  G: ObjectiveType,
                  u0 : np.ndarray,

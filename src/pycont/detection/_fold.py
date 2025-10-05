@@ -32,8 +32,10 @@ def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 	-------
 		is_fold_point : boolean
 			True if we detected an antual fold point.
-        x_fold: ndarray
+        x_fold : ndarray
 			The location of the fold point within the tolerance.
+		alpha_fold : float
+			Location of `x_fold` as a fraction between `x_left` and `x_right`.
 	"""
 	rdiff = sp["rdiff"]
 	M = len(x_left)-1
@@ -57,7 +59,7 @@ def computeFoldPoint(G : Callable[[np.ndarray, float], np.ndarray],
 	except ValueError: # No sign change detected
 		return False, x_right, 1.0
 	except opt.NoConvergence:
-		return False, x_left, 0.0
+		return False, x_right, 1.0
 	
 	x_fold = x_left + alpha_fold * (x_right - x_left)
 	return True, x_fold, alpha_fold

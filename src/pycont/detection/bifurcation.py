@@ -16,7 +16,13 @@ class BifurcationState:
     w_vectors : np.ndarray
 
 class BifurcationDetectionModule(DetectionModule):
+    """
+    Bifurcation detection module that computes the values of the test functions at every point.
+    The number of test functions should be set via `n_bifurcation_vectors` in the solver parameters. 
+    Default is min(3, M). 
 
+    The Jacobian-based test functions and bifurcation-point localizers are implemented in _bifurcation.py.
+    """
     def __init__(self,
                  G: ObjectiveType,
                  u0 : np.ndarray,

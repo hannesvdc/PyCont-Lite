@@ -153,7 +153,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"Require param_min < param_max, got {param_min} and {param_max}")
 
     # Check bifurcation detection parameters, if enabled.
-    bifurcation_detection = sp.setdefault("bifurcation_detection", True)
+    bifurcation_detection = sp.get("bifurcation_detection", True)
     if bifurcation_detection:
         detectionModules.append(BifurcationDetectionModule(G, u0, p0, sp))
     #if bifurcation_detection:
@@ -162,7 +162,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     #        raise InputError(f"number of bifurcation vectors must be a positive integer, got {n_bifurcation_vectors}.")
 
     # Check Hopf detection parameters, if enabled
-    hopf_detection = sp.setdefault("hopf_detection", False)
+    hopf_detection = sp.get("hopf_detection", False)
     if hopf_detection:
         detectionModules.append(HopfDetectionModule(G, u0, p0, sp))
     #if hopf_detection:

@@ -16,6 +16,13 @@ class HopfState:
     lead : int
 
 class HopfDetectionModule(DetectionModule):
+    """
+    Module to detect Hopf points by tracking the few eigenvalues with largest real part.
+    The main assumption behind this implementation is that the system is only marginally
+    unstable with only a few eigenvalues on the right side of the imaginary axis.
+
+    Numerical eigenvalue computations and Hopf detection and localization are implemented in _hopf.py.
+    """
 
     def __init__(self,
                  G: ObjectiveType,

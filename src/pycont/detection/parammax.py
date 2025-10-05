@@ -8,6 +8,13 @@ from ..exceptions import InputError
 from typing import Dict, Any, Callable, Optional
 
 class ParamMaxDetectionModule(DetectionModule):
+    """ 
+    Detection module to halt continuation beyond `param_max` - if the value is set by the user.
+    The `update` function only fires on the first point beyond this maximal paramter value, at
+    the moment of crossing, not anymore after.
+
+    `localize` computes the point with `p = param_max` on the continuation boundary.
+    """
 
     def __init__(self,
                  G: ObjectiveType,
