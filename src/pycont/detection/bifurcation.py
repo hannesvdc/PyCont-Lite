@@ -24,7 +24,7 @@ class BifurcationDetectionModule(DetectionModule):
         super().__init__("BP", G, u0, p0, sp)
 
         # Do checks
-        self.n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, self.M))
+        self.n_bifurcation_vectors = sp.get("n_bifurcation_vectors", min(3, self.M))
         if self.n_bifurcation_vectors < 0:
             raise InputError(f"number of bifurcation vectors must be a positive integer, got {self.n_bifurcation_vectors}.")
         

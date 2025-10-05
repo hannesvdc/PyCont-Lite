@@ -36,7 +36,7 @@ class DetectionModule(abc.ABC):
         Nothing.
         """
         self.kind = kind
-        
+
         self.G = G
         self.M = len(u0)
         self.sp = {} if sp is None else dict(sp)
