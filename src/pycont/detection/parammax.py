@@ -14,7 +14,7 @@ class ParamMaxDetectionModule(DetectionModule):
                  p0 : float,
                  sp: Dict[str, Any],
                  param_max_value : float) -> None:
-        super().__init__(G, u0, p0, sp)
+        super().__init__("PARAM_MAX", G, u0, p0, sp)
         self.param_max_value = param_max_value
 
         if self.param_max_value > p0:

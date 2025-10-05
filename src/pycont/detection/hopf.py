@@ -21,7 +21,7 @@ class HopfDetectionModule(DetectionModule):
                  u0 : np.ndarray,
                  p0 : float,
                  sp: Dict[str, Any]) -> None:
-        super().__init__(G, u0, p0, sp)
+        super().__init__("HB", G, u0, p0, sp)
 
         if self.M < 2:
             raise InputError(f"Can't do Hopf detection on one-dimensional systems.")

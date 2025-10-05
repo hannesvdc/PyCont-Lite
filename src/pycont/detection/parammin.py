@@ -32,7 +32,7 @@ class ParamMinDetectionModule(DetectionModule):
         -------
         Nothing.
         """
-        super().__init__(G, u0, p0, sp)
+        super().__init__("PARAM_MIN", G, u0, p0, sp)
         self.param_min_value = param_min_value
 
         if self.param_min_value > p0:

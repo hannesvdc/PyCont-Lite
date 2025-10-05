@@ -1,5 +1,7 @@
 import numpy as np
 
+from ..Types import EventKind
+
 import abc
 from typing import Callable, Dict, Any, Optional
 
@@ -8,6 +10,7 @@ ObjectiveType = Callable[[np.ndarray, float], np.ndarray]
 class DetectionModule(abc.ABC):
 
     def __init__(self,
+                 kind : EventKind,
                  G : ObjectiveType,
                  u0 : np.ndarray,
                  p0 : float,
@@ -17,6 +20,8 @@ class DetectionModule(abc.ABC):
 
         Parameters
         ----------
+        kind : EventKind
+            The corresponding event kind to this detection module.
         G : Callable
             The continuation objective function.
         u0 : ndarray
@@ -30,6 +35,8 @@ class DetectionModule(abc.ABC):
         -------
         Nothing.
         """
+        self.kind = kind
+        
         self.G = G
         self.M = len(u0)
         self.sp = {} if sp is None else dict(sp)

@@ -12,7 +12,7 @@ class FoldDetectionModule(DetectionModule):
                  u0 : np.ndarray,
                  p0 : float,
                  sp: Dict[str, Any]) -> None:
-        super().__init__(G, u0, p0, sp)
+        super().__init__("LP", G, u0, p0, sp)
 
     def initializeBranch(self,
                          x : np.ndarray,

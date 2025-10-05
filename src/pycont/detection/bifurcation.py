@@ -21,7 +21,7 @@ class BifurcationDetectionModule(DetectionModule):
                  u0 : np.ndarray,
                  p0 : float,
                  sp: Dict[str, Any]) -> None:
-        super().__init__(G, u0, p0, sp)
+        super().__init__("BP", G, u0, p0, sp)
 
         # Do checks
         self.n_bifurcation_vectors = sp.setdefault("n_bifurcation_vectors", min(3, self.M))
