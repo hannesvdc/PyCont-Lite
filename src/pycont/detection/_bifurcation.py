@@ -1,38 +1,9 @@
 import numpy as np
 import scipy.optimize as opt
 
-from .Logger import LOG
+from ..Logger import LOG
 
 from typing import Callable, Tuple, Dict
-
-def initializeBifurcationDetection(x : np.ndarray,
-                                   l_vectors : np.ndarray, 
-					               r_vectors : np.ndarray, 
-                                   n_bifurcation_vectors : int) -> Dict:
-    """
-    Initialize the Bifurcation detection toolkit by creating the first (empty)
-    bifurcation state.
-
-    Parameters
-    ----------
-    x : ndarray
-        The (typically) initial point on the branch.
-    l_vectors : ndarray
-        The left vectors used for bifurcation detection.
-    r_vectors : ndarray
-        The right vectors used for bifurcation detection.
-    n_bifurcation_vectors : int
-        The numnber of (l- and r-) vectors used for detection.
-
-    Returns
-    -------
-    bifurcation_state : Dict
-        Dictionary with fields `w_values` (test values), `w_vectors` (test vectors),
-        and `x` (the current point on the branch)
-    """
-    w_vectors = np.zeros_like(r_vectors)
-    w_values = np.zeros(n_bifurcation_vectors)
-    return {'w_values' : w_values, 'w_vectors' : w_vectors, 'x' : np.copy(x)}
 
 def test_fn_jacobian(F : Callable[[np.ndarray], np.ndarray], 
 					 x : np.ndarray,
@@ -89,8 +60,8 @@ def test_fn_jacobian_multi(F : Callable[[np.ndarray], np.ndarray],
 					       x : np.ndarray,
 					       l_vectors : np.ndarray, 
 					       r_vectors : np.ndarray, 
-					       prev_bf_state : Dict, 
-					       sp : Dict) -> Dict:
+					       prev_w_vectors : np.ndarray, 
+					       sp : Dict) -> Tuple[np.ndarray, np.ndarray]:
     """
     The main bifurcation detection test function.
 
@@ -104,8 +75,8 @@ def test_fn_jacobian_multi(F : Callable[[np.ndarray], np.ndarray],
         The left vectors used for bifurcation detection.
     r_vectors : ndarray
         The right vectors used for bifurcation detection.
-    prev_bf_state : Dict
-        Bifurcation detection state at the previous point.
+    prev_w_vectors : ndarray
+        The bifurcation detection vectors at the previous points.
     sp : Dict
         Solver parameters
 
@@ -114,7 +85,6 @@ def test_fn_jacobian_multi(F : Callable[[np.ndarray], np.ndarray],
     bifurcation_state : Dict
         Dictionary containing the current bifurcation detection state.
     """
-    prev_w_vectors = prev_bf_state["w_vectors"]
 
     w_vectors = np.zeros_like(prev_w_vectors)
     w_values = np.zeros(prev_w_vectors.shape[0])
@@ -123,92 +93,14 @@ def test_fn_jacobian_multi(F : Callable[[np.ndarray], np.ndarray],
         w_vectors[index,:] = w_i
         w_values[index] = value_i
     
-    # Pack the values and vectors in a new state object and return
-    state = {'w_values' : w_values, 'w_vectors' : w_vectors, 'x' : np.copy(x)}
-    return state
-
-# def test_fn_bordered(F : Callable[[np.ndarray], np.ndarray], 
-# 					 x : np.ndarray,
-# 					 l : np.ndarray, 
-# 					 r : np.ndarray, 
-# 					 w_prev : np.ndarray, 
-#                      M : int,
-# 					 sp : Dict) -> Tuple[np.ndarray, float]:
-#     """
-#     Bifurcation point test function. A bifurcation point is given by the last component
-#     of the solution `w` to the bordered system [J r; l^T 0]w = [0 0 ... 0 1] changing sign.
-
-#     Parameters
-#     ----------
-#     F : Callable
-#         The extended objective function.
-#     x : ndarray
-#         The current point `(u,p)` on the branch.
-#     l, r : ndarray 
-#         The left and right test vectors. Cannot have any components in the direction of 
-#         the current tangent. Must also be normalized.
-#     w_prev : ndarray
-#         Solution to the Jacobian system in the previous point on the branch. Used as initial guess.
-#     M : int
-#         The size of the state vector `u`. w_prev must be of size M+2.
-#     sp : Dict
-#         Solver parameters.
-
-#     Returns
-#     -------
-#         w_solution : ndarray
-#             The full solution to the Jacobian system.
-#         beta : float
-#             The value of the test function. Monitor this for sign changes.
-#     """
-
-#     rdiff = sp["rdiff"]
-#     rhs = np.zeros_like(w_prev); rhs[M+1] = 1.0
-#     def matvec(w):
-#         v = w[0:M+1]
-#         beta = w[M+1]
-#         norm_v = np.linalg.norm(v)
-#         if norm_v == 0.0:
-#             J = 0.0 * v
-#         else:
-#             eps = rdiff / norm_v
-#             J = (F(x + eps * v) - F(x - eps * v)) / (2.0*eps)
-#         J_eq = J + r * beta
-#         l_eq = np.dot(l, v)
-#         return np.append(J_eq, l_eq) - rhs
-
-#     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
-#         w_solution = opt.newton_krylov(matvec, w_prev, f_tol=1e-3, rdiff=rdiff, verbose=False)
-#     residual = np.linalg.norm(matvec(w_solution))
-#     test_fn_value = w_solution[M+1]
-#     LOG.verbose(f'Jacobian test FN = {test_fn_value}, residual = {residual}')
-
-#     return w_solution, test_fn_value
-
-def detectBifurcationPoint(prev_bf_state : Dict,
-                           curr_bf_state : Dict) -> bool:
-    """
-    Funtion that checks whether a bifurcation point lies between the two bifurcation
-    states `prev_bf_state` and `curr_bf_state` by comparing the signs of the test
-    function values. 
-
-    Parameters
-    ----------
-    prev_bf_state : Dict
-        The bifurcation state at the previous continuation point.
-    curr_bf_state : Dict
-        The bifurcation state at the current continuation point.
-    """
-    prev_w_values = prev_bf_state["w_values"]
-    curr_w_values = curr_bf_state["w_values"]
-
-    return (prev_w_values * curr_w_values < 0.0) & (np.abs(curr_w_values) < 1000.0) & (np.abs(prev_w_values) < 1000.0)
+    return w_values, w_vectors
 
 def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
-                            start_bf_state : Dict,
-                            end_bf_state : Dict,
+                            x_left : np.ndarray,
+                            x_right : np.ndarray,
 							l_vectors : np.ndarray, 
 							r_vectors : np.ndarray,
+                            w_vectors_left : np.ndarray,
                             index : int,
                             M : int,
 							sp : Dict) -> Tuple[bool, np.ndarray, float]:
@@ -219,12 +111,12 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     ----------
     F : Callable
         The extended objective function.
-    start_bf_state
-        Bifurcation detection state at the point prior to bifurcation point.
-    end_bf_state
-        Bifurcation detection state at the point after to bifurcation point.
+    x_left, x_right : ndarray
+        Points to the left and right of the bifurcation point, respectively
     l_vectors, r_vectors : ndarray 
         The left and right test vectors.
+    w_vectors_left : ndarray
+        The w-vectors at x_left, used to speed up calculations.
     index : int
         The index of the test function that underwent a sign change.
     M : int
@@ -244,13 +136,10 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
     """
     rdiff = sp["rdiff"]
 
-    x_start = start_bf_state['x']
-    x_end = end_bf_state['x']
-    w = end_bf_state['w_vectors'][index]
+    x_diff = x_right - x_left
     l = l_vectors[index]
     r = r_vectors[index]
-
-    x_diff = x_end - x_start
+    w = w_vectors_left[index]
     if len(w) == M+1:
         S = np.dot(l, w)
         z0 = np.append(w / S, -1.0 / S)
@@ -259,7 +148,7 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
 
     # Build the Bisection Objective Function
     def BFObjective(alpha : float) -> float:
-        x = x_start + alpha * x_diff
+        x = x_left + alpha * x_diff
         
         # Build the linear system
         rhs = np.zeros(M+2); rhs[M+1] = 1.0
@@ -284,10 +173,10 @@ def computeBifurcationPoint(F : Callable[[np.ndarray], np.ndarray],
         alpha_singular, result = opt.brentq(BFObjective, 0.0, 1.0, full_output=True, disp=False)
     except ValueError: # No sign change detected
         LOG.verbose('Value error caught')
-        return False, x_end, 1.0
+        return False, x_right, 1.0
     except opt.NoConvergence:
         LOG.verbose('NoConvergence error caught')
-        return False, x_end, 1.0
-    x_singular = x_start + alpha_singular * x_diff
+        return False, x_right, 1.0
+    x_singular = x_left + alpha_singular * x_diff
 
     return True, x_singular, alpha_singular

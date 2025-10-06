@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),  
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- **High-Precision Hopf Localization** after Hopf detection by means of precise eigenvalue computations.
+
+### Changed
+- **Created Detection Modules** for param min, param max, fold, bifurcation and Hopf detection. Uses same underlying numerical code and algorithms, just gives for a cleaner continuation structure that loops over the detection modules.
+
+### Removed
+- **Bifurcation.py** is now in detection/_bifurcation.py
+- **Hopf.py** is now in detection/_hopf.py
+- **Fold Localization** is now in detection/_fold.py
+- **Param_min / Param_max** moved from ArclengthContinuation.py to detection/parammin.py and detection/parammax.py respectively.
+
 ## [0.4.0] - 2025-09-28
 
 ### Added

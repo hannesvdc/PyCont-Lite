@@ -1,7 +1,8 @@
 import numpy as np
 import scipy.sparse.linalg as slg
+import scipy.optimize as opt
 
-from .Logger import LOG
+from ..Logger import LOG
 
 from typing import Callable, Dict, Tuple
 
@@ -53,7 +54,8 @@ def _filterComplexConjugated(eigvals: np.ndarray,
 def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
                    u : np.ndarray,
                    p : float,
-                   sp: Dict) -> Dict:
+                   m_eigs : int,
+                   sp: Dict) -> Tuple[np.ndarray, np.ndarray, int]:
     """
     Initialize the Hopf Bifurcation Detection Method by generating the eigenvalues 
     closest to the imaginary axis. These are the ones we want to follow throughout
@@ -69,18 +71,21 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The current state vector on the path.
     p : float
         The current parameter value.
+    m_eigs : int
+        The number of Hopf eigenvalues to track.
     sp : Dict
         Solver parameters including arguments `keep_r` and `m_target`.
 
     Returns
     -------
-    hopf_state: Dict
-        Contains the current eigenvalues "eig_vals" and eigenvectors "eig_vecs", index 
-        "lead" of the eigenvalue  closes to the imaginary axis, and "omega" the imaginary
-        part of this eigenvalue.
+    eigvals : ndarray
+        Eigenvalues of DG with largest real part
+    eigvecs : ndarray
+        Corresponding eigenvectors in the columns of this matrix
+    lead : int
+        The index of the leading eigenvalue - the one closest to the imaginary axis.
     """
     LOG.verbose(f"Initializing Hopf")
-    m_eigs = sp["n_hopf_eigenvalues"]
     omega_min = 1e-3
 
     # Create JVP
@@ -107,17 +112,15 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
     if lead != -1 and np.abs(np.real(eigvals[lead])) < 1e-10:
         eigvals[lead] = 1j * np.imag(eigvals[lead])
     LOG.verbose(f'eigvals{eigvals}')
-    omega = float(abs(eigvals[lead].imag)) if lead != -1 else 0.0
-    state = {
-        "eig_vals" : eigvals, "eig_vecs" : V, "lead" : lead, "omega" : omega
-    }
-    return state
+
+    return eigvals, V, lead
 
 def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
                 u : np.ndarray,
                 p : float,
-                prev_hopf_state : Dict,
-                sp: Dict) -> Dict:
+                eigvals_prev : np.ndarray,
+                eigvecs_prev : np.ndarray,
+                sp: Dict) -> Tuple[np.ndarray, np.ndarray, int]:
     """
     Recompute Hopf state by updating the eigenvalues closest to the imaginary axis. 
     Updating is done by one iteration of the Rayleigh method: for each eigenpair
@@ -132,25 +135,27 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         The current state vector on the path.
     p : float
         The current parameter value.
-    prev_hopf_state : Dict
-        The Hopf state at the previous continuation point.
+    eigvals_prev : ndarray
+        The eigenvalues at the previous continuation piont.
+    eigvecs_prev : ndarray
+        The eigenvectors at the previous continuation point.
     sp : Dict
         Solver parameters including arguments `keep_r` and `m_target`.
 
     Returns
     -------
-    hopf_state: Dict
-        Contains the current eigenvalues "eig_vals" and eigenvectors "eig_vecs", index 
-        "lead" of the eigenvalue  closes to the imaginary axis, and "omega" the imaginary
-        part of this eigenvalue.
+    eigvals_new : ndarray
+        Eigenvalues of DG with largest real part at `(u,p)`
+    eigvecs_new : ndarray
+        Corresponding eigenvectors in the columns of this matrix
+    lead : int
+        The index of the leading eigenvalue - the one closest to the imaginary axis.
     """
     jitter = 0.001
     omega_min = 1e-3
 
-    eig_vals_prev = prev_hopf_state["eig_vals"]
-    eig_vecs_prev = prev_hopf_state["eig_vecs"]
-    eig_vals_new = np.empty_like(eig_vals_prev, dtype=np.complex128)
-    eig_vecs_new = np.empty_like(eig_vecs_prev, dtype=np.complex128)
+    eigvals_new = np.empty_like(eigvals_prev, dtype=np.complex128)
+    eigvecs_new = np.empty_like(eigvecs_prev, dtype=np.complex128)
 
     # Create JVP
     M = len(u)
@@ -158,7 +163,7 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
     Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
 
     # Loop over previous eigenvalues and update with the new Jacobian
-    for i, (sigma_i, v_i) in enumerate(zip(eig_vals_prev, eig_vecs_prev.T)):
+    for i, (sigma_i, v_i) in enumerate(zip(eigvals_prev, eigvecs_prev.T)):
         v0 = v_i.astype(np.complex128, copy=False)
         nv = np.linalg.norm(v0)
         v0 = v0 / nv
@@ -171,7 +176,7 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128) # type:ignore
 
         #inexact solve: (J - sigma I) w = v0
-        w, info = slg.lgmres(A, v0, maxiter=8)
+        w, info = slg.lgmres(A, v0, x0=v0, maxiter=8)
         residual = np.linalg.norm(A_mv(w) - v0)
         v_new = w / (np.linalg.norm(w) + 1e-16)
         LOG.verbose(f'Hopf LGRMES Resisdual {residual}')
@@ -179,38 +184,90 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         # Rayleigh quotient update
         Jv_v_new = Jv(v_new)
         sigma_new = np.vdot(v_new, Jv_v_new) / np.vdot(v_new, v_new)
-        eig_vals_new[i] = sigma_new
-        eig_vecs_new[:, i] = v_new
+        eigvals_new[i] = sigma_new
+        eigvecs_new[:, i] = v_new
 
     # Pick lead complex eigenvalue closest to imaginary axis
-    lead = _pick_near_axis(eig_vals_new, omega_min)  # returns -1 if none
-    omega = float(abs(eig_vals_new[lead].imag)) if lead != -1 else 0.0
-    LOG.verbose(f'Hopf Value {eig_vals_new[lead]}')
+    lead = _pick_near_axis(eigvals_new, omega_min)  # returns -1 if none
+    LOG.verbose(f'Hopf Value {eigvals_new[lead]}')
 
-    return {"eig_vals": eig_vals_new, "eig_vecs": eig_vecs_new, "lead": lead, "omega": omega}
+    return eigvals_new, eigvecs_new, lead
 
-def detectHopf(prev_state : Dict,
-               curr_state : Dict) -> bool:
+def detectHopf(eigvals_prev : np.ndarray,
+               eigvals_new : np.ndarray,
+               lead_prev : int,
+               lead_new) -> bool:
     """
     Main Hopf detection algorith. Checks if the real parts of the leading eigenvalues
     in the state dicts have a different sign.
 
     Parameters
     ----------
-    prev_state : Dict
-        State of the Hopf detection function at the previous point.
-    curr_state : Dict
-        State of the Hopf detection function at the current point.
+    eigvals_prev : Dict
+        Hopf eigenvalues at the previous point.
+    eigvals_new : Dict
+        Hopf eigenvalues at the current point.
+    lead_prev : int
+        Index of the leading eigenvalue in `eigvals_prev`.
+    lead_new : int 
+        Index of the leading eigenvalue in `eigvals_new`.
 
     Returns
     -------
     is_hopf : bool
         True if a Hopf point lies between the two points, False otherwise.
     """
-    if prev_state["lead"] < 0 or curr_state["lead"] < 0:
+    if lead_prev < 0 or lead_new < 0:
         return False
-    
-    prev_leading_ritz_value = prev_state["eig_vals"][prev_state["lead"]]
-    curr_leading_ritz_value = curr_state["eig_vals"][curr_state["lead"]]
+    prev_leading_ritz_value = eigvals_prev[lead_prev]
+    curr_leading_ritz_value = eigvals_new[lead_new]
 
     return np.real(prev_leading_ritz_value) * np.real(curr_leading_ritz_value) < 0.0
+
+def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
+                 x_left : np.ndarray,
+                 x_right : np.ndarray,
+                 lam_left : np.complex128,
+                 lam_right : np.complex128,
+                 w_left : np.ndarray,
+                 w_right : np.ndarray,
+                 M : int,
+                 sp : Dict) -> Tuple[bool, np.ndarray]:
+    rdiff = sp["rdiff"]
+    nk_tolerance = max(rdiff, sp['tolerance'])
+    jitter = 1e-6
+    
+    def realPartHopfEigenvalue(alpha : float):
+        # Build the Jacobian-vector product
+        x = (1.0 - alpha) * x_left + alpha * x_right
+        u = x[0:M]
+        p = x[M]
+        Jv = lambda v : (G(u + rdiff * v, p) - G(u - rdiff * v, p)) / rdiff
+
+        # Build the linear system to solve for the complex eigenvalue
+        lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right
+        matvec = lambda v : Jv(v) - (lam_guess + 1j*jitter) * v
+        
+        # Solve the linear system using Newton-Krylov
+        w_guess = (1.0 - alpha) * w_left + alpha * w_right
+        w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance)
+
+        # Compute the Rayleigh coefficient and return its real part
+        lam = np.dot(w, Jv(w)) / np.dot(w, w)
+        LOG.verbose(f'Hopf Eigenvalue {np.real(lam)} at alpha = {alpha}')
+        return np.real(lam)
+    
+    # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part
+    alpha_left = -2.0
+    alpha_right = 3.0
+    LOG.verbose(f'BrentQ Edge points {realPartHopfEigenvalue(alpha_left)}, {realPartHopfEigenvalue(alpha_right)}')
+    try:
+        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, full_output=True, disp=True)
+    except ValueError:
+        return False, x_right
+    except opt.NoConvergence:
+        return False, x_right
+
+    # Compute the lcoation of the Hopf point and return
+    x_hopf = (1.0 - alpha_hopf) * x_left + alpha_hopf * x_right
+    return True, x_hopf
