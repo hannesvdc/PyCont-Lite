@@ -309,6 +309,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # If we ended on a Hopf point, calculate the limit cycle and continue both.
     elif termination_event.kind == "HB":
+        # TODO: Add a small jump to x_hopf to restart continuation
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
         _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)

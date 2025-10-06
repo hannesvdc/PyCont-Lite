@@ -3,7 +3,7 @@ import numpy as np
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
-from ._hopf import initializeHopf, refreshHopf, detectHopf
+from ._hopf import initializeHopf, refreshHopf, detectHopf, localizeHopf
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
@@ -62,4 +62,18 @@ class HopfDetectionModule(DetectionModule):
         return False
     
     def localize(self) -> Optional[np.ndarray]:
-        return self.new_state.x
+        prev_lead_index = self.prev_state.lead
+        prev_eigval = self.prev_state.eigvals[prev_lead_index]
+        prev_eigvec = self.prev_state.eigvecs[:,prev_lead_index]
+        lead_index = self.new_state.lead
+        lead_eigval = self.new_state.eigvals[lead_index]
+        lead_eigvec = self.new_state.eigvecs[:,lead_index]
+
+        is_hopf, hopf_point = localizeHopf(self.G, self.prev_state.x, self.new_state.x, prev_eigval, lead_eigval, prev_eigvec, lead_eigvec, self.M, self.sp)
+        if is_hopf:
+            LOG.info(f'Hopf Point localized at {hopf_point}')
+            return hopf_point
+        
+        LOG.info('Erroneous Hopf point detected, most likely due to inaccurate eigenvalue computations. Continuing along this branch.')
+        self.prev_state = self.new_state
+        return None

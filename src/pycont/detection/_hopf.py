@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse.linalg as slg
+import scipy.optimize as opt
 
 from ..Logger import LOG
 
@@ -175,7 +176,7 @@ def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
         A = slg.LinearOperator(shape=(M, M), matvec=A_mv, dtype=np.complex128) # type:ignore
 
         #inexact solve: (J - sigma I) w = v0
-        w, info = slg.lgmres(A, v0, maxiter=8)
+        w, info = slg.lgmres(A, v0, x0=v0, maxiter=8)
         residual = np.linalg.norm(A_mv(w) - v0)
         v_new = w / (np.linalg.norm(w) + 1e-16)
         LOG.verbose(f'Hopf LGRMES Resisdual {residual}')
@@ -222,3 +223,51 @@ def detectHopf(eigvals_prev : np.ndarray,
     curr_leading_ritz_value = eigvals_new[lead_new]
 
     return np.real(prev_leading_ritz_value) * np.real(curr_leading_ritz_value) < 0.0
+
+def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
+                 x_left : np.ndarray,
+                 x_right : np.ndarray,
+                 lam_left : np.complex128,
+                 lam_right : np.complex128,
+                 w_left : np.ndarray,
+                 w_right : np.ndarray,
+                 M : int,
+                 sp : Dict) -> Tuple[bool, np.ndarray]:
+    rdiff = sp["rdiff"]
+    nk_tolerance = max(rdiff, sp['tolerance'])
+    jitter = 1e-6
+    
+    def realPartHopfEigenvalue(alpha : float):
+        # Build the Jacobian-vector product
+        x = (1.0 - alpha) * x_left + alpha * x_right
+        u = x[0:M]
+        p = x[M]
+        Jv = lambda v : (G(u + rdiff * v, p) - G(u - rdiff * v, p)) / rdiff
+
+        # Build the linear system to solve for the complex eigenvalue
+        lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right
+        matvec = lambda v : Jv(v) - (lam_guess + 1j*jitter) * v
+        
+        # Solve the linear system using Newton-Krylov
+        w_guess = (1.0 - alpha) * w_left + alpha * w_right
+        w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance)
+
+        # Compute the Rayleigh coefficient and return its real part
+        lam = np.dot(w, Jv(w)) / np.dot(w, w)
+        LOG.verbose(f'Hopf Eigenvalue {np.real(lam)} at alpha = {alpha}')
+        return np.real(lam)
+    
+    # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part
+    alpha_left = -2.0
+    alpha_right = 3.0
+    LOG.verbose(f'BrentQ Edge points {realPartHopfEigenvalue(alpha_left)}, {realPartHopfEigenvalue(alpha_right)}')
+    try:
+        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, full_output=True, disp=True)
+    except ValueError:
+        return False, x_right
+    except opt.NoConvergence:
+        return False, x_right
+
+    # Compute the lcoation of the Hopf point and return
+    x_hopf = (1.0 - alpha_hopf) * x_left + alpha_hopf * x_right
+    return True, x_hopf
