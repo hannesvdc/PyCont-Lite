@@ -1,6 +1,6 @@
 # PyCont-Lite
 
-[![PyPI version](https://badge.fury.io/py/pycont-lite.svg?cacheBust=6)](https://badge.fury.io/py/pycont-lite)
+[![PyPI version](https://badge.fury.io/py/pycont-lite.svg)](https://badge.fury.io/py/pycont-lite)
 
 **PyCont-Lite** is a lightweight, matrix-free arclength continuation library for solving nonlinear parametric systems
 
@@ -355,9 +355,9 @@ This makes it easy to explore and plot bifurcation diagrams programmatically.
 
 ## Planned Features
 The following features are under active consideration for future releases:
-- Hopf point localization
 - Limit cycle continuation
 - Complete backend-agnostic implementation
+- Choice of finite-differences or external automatic differentiation for gradients.
 
 ## License
 
