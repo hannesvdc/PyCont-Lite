@@ -48,9 +48,9 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
         Initial continuation step size.
     n_steps : int
         Maximum number of continuation steps to perform.
-	branch_id : int 
-		Integer identifier of the current branch.
-	detectionModules : List[DetectionModule]
+    branch_id : int 
+        Integer identifier of the current branch.
+    detectionModules : List[DetectionModule]
         The list of active detection modules for this continuation stage.
     sp : dict
 		Additional paramters for PyCont.
@@ -116,8 +116,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			LOG.info('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
 			branch.termination_event = termination_event
-			branch.commit()
-			return branch.trim(), termination_event
+			return branch.commit().trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
@@ -157,5 +156,4 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
 	branch.termination_event = termination_event
-	branch.commit()
-	return branch.trim(), termination_event
+	return branch.commit().trim(), termination_event

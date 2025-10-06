@@ -48,6 +48,7 @@ class Branch:
 		for point in self._tentativePoints:
 			self.addPoint(point[0], point[1])
 		self._tentativePoints.clear()
+		return self
 
 	def trim(self):
 		self.u_path = self.u_path[0:self._index,:]
