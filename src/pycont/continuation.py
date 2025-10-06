@@ -131,6 +131,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
     sp.setdefault("analyze_stability", True)
     sp.setdefault("seed", 12345)
+    sp["s_jump"] = 0.01
     
     # Check continuation parameters
     if n_steps < 1 or int(n_steps) != n_steps:
@@ -309,7 +310,10 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     # If we ended on a Hopf point, calculate the limit cycle and continue both.
     elif termination_event.kind == "HB":
-        # TODO: Add a small jump to x_hopf to restart continuation
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
-        _recursiveContinuation(G, x_hopf[0:M], x_hopf[M], tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
+
+        # Add a tiny jump so we don't rediscover the same Hopf point again
+        x_init = x_hopf + sp["s_jump"] * tangent
+        new_tangent = computeTangent(G, x_init[0:M], x_init[M], tangent, sp)
+        _recursiveContinuation(G, x_init[0:M], x_init[M], new_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)

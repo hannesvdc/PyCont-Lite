@@ -209,12 +209,12 @@ def branchSwitching(G : Callable[[np.ndarray, float], np.ndarray],
         alpha = solutions[n][0]
         beta  = solutions[n][1]
 
-        s = 0.01
-        N = lambda x: np.dot(alpha*phi + beta/np.sqrt(1.0)*w, x[0:M] - x_singular[0:M]) + beta/np.sqrt(1.0)*(x[M] - x_singular[M]) - s
+        #s = 0.01
+        N = lambda x: np.dot(alpha*phi + beta/np.sqrt(1.0)*w, x[0:M] - x_singular[0:M]) + beta/np.sqrt(1.0)*(x[M] - x_singular[M]) - sp["s_jump"]
         F_branch = lambda x: np.append(G(x[0:M], x[M]), N(x))
 
         tangent = np.append(alpha*phi + beta/np.sqrt(1.0)*w, beta/np.sqrt(1.0))
-        x0 = x_singular + s * tangent / lg.norm(tangent)
+        x0 = x_singular + sp["s_jump"] * tangent / lg.norm(tangent)
         dir = opt.newton_krylov(F_branch, x0, rdiff=sp["rdiff"], f_tol=sp["tolerance"])
 
         directions.append(dir)
