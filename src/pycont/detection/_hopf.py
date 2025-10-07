@@ -250,7 +250,7 @@ def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
         
         # Solve the linear system using Newton-Krylov
         w_guess = (1.0 - alpha) * w_left + alpha * w_right
-        w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance)
+        w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance, verbose=True)
 
         # Compute the Rayleigh coefficient and return its real part
         lam = np.dot(w, Jv(w)) / np.dot(w, w)
@@ -262,7 +262,7 @@ def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
     alpha_right = 3.0
     LOG.verbose(f'BrentQ Edge points {realPartHopfEigenvalue(alpha_left)}, {realPartHopfEigenvalue(alpha_right)}')
     try:
-        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, full_output=True, disp=True)
+        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, maxiter=1000, full_output=True, disp=True)
     except ValueError:
         return False, x_right
     except opt.NoConvergence:
