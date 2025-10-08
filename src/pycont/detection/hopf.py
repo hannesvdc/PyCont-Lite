@@ -3,7 +3,7 @@ import numpy as np
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
-from ._hopf import initializeHopf, refreshHopf, detectHopf, localizeHopf
+from ._hopf import initializeHopf, refreshHopf, detectHopf, localizeHopf, refreshHopfJacobiDavidson
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
@@ -48,7 +48,7 @@ class HopfDetectionModule(DetectionModule):
                tangent_new : np.ndarray) -> bool:
         u_new = x_new[0:self.M]
         p_new = x_new[self.M]
-        eigvals, eigvecs, lead = refreshHopf(self.G, u_new, p_new, self.prev_state.eigvals, self.prev_state.eigvecs, self.sp)
+        eigvals, eigvecs, lead = refreshHopfJacobiDavidson(self.G, u_new, p_new, self.prev_state.eigvals, self.prev_state.eigvecs, self.sp)
         self.new_state = HopfState(np.copy(x_new), eigvals, eigvecs, lead)
 
         # If we passed a Hopf point, return True for localization.

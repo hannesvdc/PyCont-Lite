@@ -115,6 +115,79 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
 
     return eigvals, V, lead
 
+def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
+                    lam0 : np.complex128,
+                    v0 : np.ndarray) -> Tuple[np.complex128, np.ndarray]:
+    weak_tolerance = 1e-3
+    M = len(v0)
+
+    v = np.copy(v0)
+    lam = lam0
+    for iter in range(3):
+
+        # Compute the residual and break if it is small enough
+        J_mv = lambda w : J(w) - lam * w
+        r = J_mv(v)
+        if np.linalg.norm(r) < weak_tolerance:
+            break
+
+        # Else compute a Newton update
+        P = lambda w : w - v * np.vdot(v, w)
+        J_reduced = lambda w : P(J_mv(P(w)))
+        try:
+            s = opt.newton_krylov(lambda w : J_reduced(w) + P(r), np.zeros_like(v), f_tol=weak_tolerance, maxiter=1) # 1 NK step = 1 LGMRES solve but better.
+        except opt.NoConvergence as e:
+            s = e.args[0]
+        except ValueError:
+            # Solve using L-GMRES if newton_krylov fails
+            s, info = slg.lgmres(slg.LinearOperator((M,M), J_reduced), -P(r), atol=weak_tolerance)
+        LOG.verbose(f"JD Residual {np.linalg.norm(J_reduced(s)+P(r))}")
+
+        # Update the eigenvector and eigenvalue
+        v = v + P(s)
+        v /= np.linalg.norm(v)
+        lam = np.vdot(v, J(v))
+
+    LOG.verbose(f"Eigenvalue after Jacobi-Davidson {lam}")
+
+    # Return the latest eigenvalue and eigenvector
+    return lam, v
+
+def refreshHopfJacobiDavidson(G: Callable[[np.ndarray, float], np.ndarray],
+                              u : np.ndarray,
+                              p : float,
+                              eigvals_prev : np.ndarray,
+                              eigvecs_prev : np.ndarray,
+                              sp: Dict) -> Tuple[np.ndarray, np.ndarray, int]:
+    
+    omega_min = 1e-3
+
+    eigvals_new = np.empty_like(eigvals_prev, dtype=np.complex128)
+    eigvecs_new = np.empty_like(eigvecs_prev, dtype=np.complex128)
+
+    # Create JVP
+    rdiff = sp["rdiff"]
+    Jv = lambda v: (G(u + rdiff*v, p) - G(u - rdiff*v, p)) / (2.0*rdiff)
+
+    # Loop over previous eigenvalues and update with the new Jacobian
+    for i, (sigma_i, v_i) in enumerate(zip(eigvals_prev, eigvecs_prev.T)):
+        v0 = v_i.astype(np.complex128, copy=False)
+        nv = np.linalg.norm(v0)
+        v0 = v0 / nv
+
+        # Update each eigenvalue and eigenvector using the Jacobi-Davidson algorithm
+        sigma_new, v_new = _JacobiDavidson(Jv, sigma_i, v0)
+
+        # Rayleigh quotient update
+        eigvals_new[i] = sigma_new
+        eigvecs_new[:, i] = v_new
+
+    # Pick lead complex eigenvalue closest to imaginary axis
+    lead = _pick_near_axis(eigvals_new, omega_min)  # returns -1 if none
+    LOG.verbose(f'Hopf Value {eigvals_new[lead]}')
+
+    return eigvals_new, eigvecs_new, lead
+
 def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
                 u : np.ndarray,
                 p : float,

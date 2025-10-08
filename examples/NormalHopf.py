@@ -16,7 +16,7 @@ def normalHopf():
     ds = 0.01
     n_steps = 200
     solver_parameters = {"tolerance": 1e-10, 'hopf_detection' : True}
-    continuation_result = pycont.arclengthContinuation(G, u0, mu0, ds_min, ds_max, ds, n_steps, solver_parameters)
+    continuation_result = pycont.arclengthContinuation(G, u0, mu0, ds_min, ds_max, ds, n_steps, solver_parameters, verbosity='verbose')
 
     pycont.plotBifurcationDiagram(continuation_result, p_label=r'$\mu$')
 
