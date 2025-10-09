@@ -3,7 +3,7 @@ import numpy as np
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
-from ._hopf import initializeHopf, refreshHopf, detectHopf, localizeHopf, refreshHopfJacobiDavidson
+from ._hopf import initializeHopf, refreshHopf, detectHopf, refreshHopfJacobiDavidson, localizeHopfJacobiDavidson
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
@@ -62,6 +62,8 @@ class HopfDetectionModule(DetectionModule):
         return False
     
     def localize(self) -> Optional[np.ndarray]:
+        LOG.info(f"Localizing the Hopf Point")
+        
         prev_lead_index = self.prev_state.lead
         prev_eigval = self.prev_state.eigvals[prev_lead_index]
         prev_eigvec = self.prev_state.eigvecs[:,prev_lead_index]
@@ -69,7 +71,15 @@ class HopfDetectionModule(DetectionModule):
         lead_eigval = self.new_state.eigvals[lead_index]
         lead_eigvec = self.new_state.eigvecs[:,lead_index]
 
-        is_hopf, hopf_point = localizeHopf(self.G, self.prev_state.x, self.new_state.x, prev_eigval, lead_eigval, prev_eigvec, lead_eigvec, self.M, self.sp)
+        is_hopf, hopf_point = localizeHopfJacobiDavidson(self.G, 
+                                                         self.prev_state.x, 
+                                                         self.new_state.x, 
+                                                         prev_eigval, 
+                                                         lead_eigval, 
+                                                         prev_eigvec, 
+                                                         lead_eigvec, 
+                                                         self.M, 
+                                                         self.sp)
         if is_hopf:
             LOG.info(f'Hopf Point localized at {hopf_point}')
             return hopf_point

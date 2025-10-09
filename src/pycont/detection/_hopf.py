@@ -117,9 +117,15 @@ def initializeHopf(G: Callable[[np.ndarray, float], np.ndarray],
 
 def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
                     lam0 : np.complex128,
-                    v0 : np.ndarray) -> Tuple[np.complex128, np.ndarray]:
-    weak_tolerance = 1e-3
+                    v0 : np.ndarray,
+                    tolerance : str) -> Tuple[np.complex128, np.ndarray]:
     M = len(v0)
+    if tolerance == 'accurate':
+        tol = 1e-8
+        maxiter = 1000
+    else: # 1 NK step = 1 LGMRES solve but better.
+        tol = 1e-3
+        maxiter = 1
 
     v = np.copy(v0)
     lam = lam0
@@ -128,19 +134,19 @@ def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
         # Compute the residual and break if it is small enough
         J_mv = lambda w : J(w) - lam * w
         r = J_mv(v)
-        if np.linalg.norm(r) < weak_tolerance:
+        if np.linalg.norm(r) < tol:
             break
 
         # Else compute a Newton update
         P = lambda w : w - v * np.vdot(v, w)
         J_reduced = lambda w : P(J_mv(P(w)))
         try:
-            s = opt.newton_krylov(lambda w : J_reduced(w) + P(r), np.zeros_like(v), f_tol=weak_tolerance, maxiter=1) # 1 NK step = 1 LGMRES solve but better.
+            s = opt.newton_krylov(lambda w : J_reduced(w) + P(r), np.zeros_like(v), f_tol=tol, maxiter=maxiter)
         except opt.NoConvergence as e:
             s = e.args[0]
         except ValueError:
             # Solve using L-GMRES if newton_krylov fails
-            s, info = slg.lgmres(slg.LinearOperator((M,M), J_reduced), -P(r), atol=weak_tolerance)
+            s, info = slg.lgmres(slg.LinearOperator((M,M), J_reduced), -P(r), atol=tol)
         LOG.verbose(f"JD Residual {np.linalg.norm(J_reduced(s)+P(r))}")
 
         # Update the eigenvector and eigenvalue
@@ -176,7 +182,7 @@ def refreshHopfJacobiDavidson(G: Callable[[np.ndarray, float], np.ndarray],
         v0 = v0 / nv
 
         # Update each eigenvalue and eigenvector using the Jacobi-Davidson algorithm
-        sigma_new, v_new = _JacobiDavidson(Jv, sigma_i, v0)
+        sigma_new, v_new = _JacobiDavidson(Jv, sigma_i, v0, tolerance='weak')
 
         # Rayleigh quotient update
         eigvals_new[i] = sigma_new
@@ -297,19 +303,18 @@ def detectHopf(eigvals_prev : np.ndarray,
 
     return np.real(prev_leading_ritz_value) * np.real(curr_leading_ritz_value) < 0.0
 
-def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
-                 x_left : np.ndarray,
-                 x_right : np.ndarray,
-                 lam_left : np.complex128,
-                 lam_right : np.complex128,
-                 w_left : np.ndarray,
-                 w_right : np.ndarray,
-                 M : int,
-                 sp : Dict) -> Tuple[bool, np.ndarray]:
+def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
+                               x_left : np.ndarray,
+                               x_right : np.ndarray,
+                               lam_left : np.complex128,
+                               lam_right : np.complex128,
+                               w_left : np.ndarray,
+                               w_right : np.ndarray,
+                               M : int,
+                               sp : Dict) -> Tuple[bool, np.ndarray]:
     rdiff = sp["rdiff"]
     nk_tolerance = max(rdiff, sp['tolerance'])
-    jitter = 1e-6
-    
+
     def realPartHopfEigenvalue(alpha : float):
         # Build the Jacobian-vector product
         x = (1.0 - alpha) * x_left + alpha * x_right
@@ -319,23 +324,20 @@ def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
 
         # Build the linear system to solve for the complex eigenvalue
         lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right
-        matvec = lambda v : Jv(v) - (lam_guess + 1j*jitter) * v
-        
-        # Solve the linear system using Newton-Krylov
         w_guess = (1.0 - alpha) * w_left + alpha * w_right
-        w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance, verbose=True)
+        lam, w = _JacobiDavidson(Jv, lam_guess, w_guess, tolerance='accurate')
 
         # Compute the Rayleigh coefficient and return its real part
-        lam = np.dot(w, Jv(w)) / np.dot(w, w)
         LOG.verbose(f'Hopf Eigenvalue {np.real(lam)} at alpha = {alpha}')
         return np.real(lam)
     
-    # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part
-    alpha_left = -2.0
-    alpha_right = 3.0
-    LOG.verbose(f'BrentQ Edge points {realPartHopfEigenvalue(alpha_left)}, {realPartHopfEigenvalue(alpha_right)}')
+    # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part. 
+    # Start with a wide bracket because we increase accuracy for localizaiton, and the 
+    # exact values of the eigenvalues may not match. 
+    alpha_left = -5.0
+    alpha_right = 6.0
     try:
-        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, maxiter=1000, full_output=True, disp=True)
+        alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, xtol=10.0*nk_tolerance, maxiter=1000, full_output=True, disp=True)
     except ValueError:
         return False, x_right
     except opt.NoConvergence:
@@ -344,3 +346,51 @@ def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
     # Compute the lcoation of the Hopf point and return
     x_hopf = (1.0 - alpha_hopf) * x_left + alpha_hopf * x_right
     return True, x_hopf
+
+# def localizeHopf(G : Callable[[np.ndarray, float], np.ndarray],
+#                  x_left : np.ndarray,
+#                  x_right : np.ndarray,
+#                  lam_left : np.complex128,
+#                  lam_right : np.complex128,
+#                  w_left : np.ndarray,
+#                  w_right : np.ndarray,
+#                  M : int,
+#                  sp : Dict) -> Tuple[bool, np.ndarray]:
+#     rdiff = sp["rdiff"]
+#     nk_tolerance = max(rdiff, sp['tolerance'])
+#     jitter = 1e-6
+    
+#     def realPartHopfEigenvalue(alpha : float):
+#         # Build the Jacobian-vector product
+#         x = (1.0 - alpha) * x_left + alpha * x_right
+#         u = x[0:M]
+#         p = x[M]
+#         Jv = lambda v : (G(u + rdiff * v, p) - G(u - rdiff * v, p)) / rdiff
+
+#         # Build the linear system to solve for the complex eigenvalue
+#         lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right
+#         matvec = lambda v : Jv(v) - (lam_guess + 1j*jitter) * v
+        
+#         # Solve the linear system using Newton-Krylov
+#         w_guess = (1.0 - alpha) * w_left + alpha * w_right
+#         w = opt.newton_krylov(matvec, w_guess, rdiff=rdiff, f_tol=nk_tolerance, verbose=True)
+
+#         # Compute the Rayleigh coefficient and return its real part
+#         lam = np.dot(w, Jv(w)) / np.dot(w, w)
+#         LOG.verbose(f'Hopf Eigenvalue {np.real(lam)} at alpha = {alpha}')
+#         return np.real(lam)
+    
+#     # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part
+#     alpha_left = -2.0
+#     alpha_right = 3.0
+#     LOG.verbose(f'BrentQ Edge points {realPartHopfEigenvalue(alpha_left)}, {realPartHopfEigenvalue(alpha_right)}')
+#     try:
+#         alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, maxiter=1000, full_output=True, disp=True)
+#     except ValueError:
+#         return False, x_right
+#     except opt.NoConvergence:
+#         return False, x_right
+
+#     # Compute the lcoation of the Hopf point and return
+#     x_hopf = (1.0 - alpha_hopf) * x_left + alpha_hopf * x_right
+#     return True, x_hopf
