@@ -80,8 +80,6 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             those with largest real part (initialized by `scipy.eigs(which='LR')`) will reliably detect
             a pair of complex conjugated eigenvalues crossing the imaginar axis. Increasing `n_hopf_eigenvalues` 
             will improve test reliability but come at a computational cost. 
-
-
     verbosity : Verbosity or String or Int
         The level of verbosity required by the user. Can either be Verbosity.QUIET (1), Verbosity.INFO (2) or Verbosity.VERBOSE (3).
         Any string representation of these words will also be accepted.
@@ -313,7 +311,9 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
 
-        # Add a tiny jump so we don't rediscover the same Hopf point again
+        # Add a tiny jump so we don't rediscover the same Hopf point again. Also project back to the path
         x_init = x_hopf + sp["s_jump"] * tangent
-        new_tangent = computeTangent(G, x_init[0:M], x_init[M], tangent, sp)
-        _recursiveContinuation(G, x_init[0:M], x_init[M], new_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
+        p_init = x_init[M]
+        u_init = opt.newton_krylov(lambda u : G(u, p_init), x_init[0:M], rdiff=sp["rdiff"])
+        new_tangent = computeTangent(G, u_init, p_init, tangent, sp)
+        _recursiveContinuation(G, u_init, p_init, new_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)

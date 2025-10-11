@@ -27,28 +27,35 @@ class Branch:
 	_tentativePoints : List[Tuple[np.ndarray, float]] = field(default_factory=list, init=False, repr=False)
 
 	def __init__(self, id : int, n_steps : int, u0 : np.ndarray, p0 : float):
-		M = len(u0)
+		self.M = len(u0)
 		self.id = id
-		self.u_path = np.zeros((n_steps+1, M)); self.u_path[0,:] = u0
+		self.u_path = np.zeros((n_steps+1, self.M)); self.u_path[0,:] = u0
 		self.p_path = np.zeros(n_steps+1); self.p_path[0] = p0
 		self.s_path = np.zeros(n_steps+1)
-		self._index = 1
+		self._index = 1 # Always the next index to insert something
 		self._tentativePoints = []
 
 	def addPoint(self, x : np.ndarray, s : float):
-		self.u_path[self._index, :] = x[0:-1]
-		self.p_path[self._index] = x[-1]
+		self.u_path[self._index, :] = x[0:self.M]
+		self.p_path[self._index] = x[self.M]
 		self.s_path[self._index] = s
 		self._index += 1
 
-	def addPointTentative(self, x : np.ndarray, s : float):
-		self._tentativePoints.append((np.copy(x), s))
+	def addSpecialPoint(self, x_special : np.ndarray, s : float):
+		p_special = x_special[self.M]
+		ascending = (p_special >= self.p_path[0])
+		if ascending:
+			insert_index = np.searchsorted(self.p_path[0:self._index], p_special, side="right")
+			print()
+		else:
+			insert_index = np.searchsorted(-self.p_path[0:self._index], -p_special, side="right")
 
-	def commit(self):
-		for point in self._tentativePoints:
-			self.addPoint(point[0], point[1])
-		self._tentativePoints.clear()
-		return self
+		# Add the special point
+		self.u_path[insert_index, :] = x_special[0:self.M]
+		self.p_path[insert_index] = p_special
+		self.s_path[insert_index] = s
+		self._index = insert_index+1
+		print('index', insert_index)
 
 	def trim(self):
 		self.u_path = self.u_path[0:self._index,:]

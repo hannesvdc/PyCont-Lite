@@ -116,7 +116,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			LOG.info('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
 			branch.termination_event = termination_event
-			return branch.commit().trim(), termination_event
+			return branch.trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
 		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
@@ -137,18 +137,15 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 				# Quit continuation and return to main driver.
 				termination_event = Event(module.kind, special_point[0:M], special_point[M], s_special, info={"tangent" : np.copy(new_tangent)})
-				branch.addPoint(special_point, s_special)
+				branch.addSpecialPoint(special_point, s_special)
 				branch.termination_event = termination_event
 				return branch.trim(), termination_event
-			
-			# Commit all tentative points on the current branch if no special point was passed
-			branch.commit()
 		
 		# Bookkeeping for the next step
 		tangent = np.copy(new_tangent)
 		x = np.copy(x_new)
 		s = new_s
-		branch.addPointTentative(x, s)
+		branch.addPoint(x, s)
 		
 		# Print the status
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
@@ -156,4 +153,4 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
 	branch.termination_event = termination_event
-	return branch.commit().trim(), termination_event
+	return branch.trim(), termination_event

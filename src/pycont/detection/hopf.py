@@ -3,7 +3,7 @@ import numpy as np
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
-from ._hopf import initializeHopf, refreshHopf, detectHopf, refreshHopfJacobiDavidson, localizeHopfJacobiDavidson
+from ._hopf import initializeHopf, detectHopf, refreshHopfJacobiDavidson, localizeHopfJacobiDavidson
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
@@ -40,6 +40,8 @@ class HopfDetectionModule(DetectionModule):
                          x : np.ndarray,
                          tangent : np.ndarray) -> None:
         eigvals, eigvecs, lead = initializeHopf(self.G, x[0:self.M], x[self.M], self.n_hopf_eigenvalues, self.sp)
+        self.in_confident_region = (np.abs(np.real(eigvals[lead])) > 3e-3)
+
         self.prev_state = HopfState(np.copy(x), eigvals, eigvecs, lead)
 
     def update(self,
@@ -53,17 +55,18 @@ class HopfDetectionModule(DetectionModule):
 
         # If we passed a Hopf point, return True for localization.
         is_hopf = detectHopf(self.prev_state.eigvals, self.new_state.eigvals, self.prev_state.lead, self.new_state.lead)
-        if is_hopf:
+        if self.in_confident_region and is_hopf:
             LOG.info(f"Hopf Point Detected near {x_new}.")
             return True
         
         # Else, update the internal state
         self.prev_state = self.new_state
+        self.in_confident_region = self.in_confident_region or (np.abs(np.real(self.prev_state.eigvals[self.prev_state.lead])) > 3e-3)
         return False
     
     def localize(self) -> Optional[np.ndarray]:
         LOG.info(f"Localizing the Hopf Point")
-        
+
         prev_lead_index = self.prev_state.lead
         prev_eigval = self.prev_state.eigvals[prev_lead_index]
         prev_eigvec = self.prev_state.eigvecs[:,prev_lead_index]
