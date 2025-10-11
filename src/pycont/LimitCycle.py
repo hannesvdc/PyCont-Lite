@@ -5,7 +5,32 @@ from typing import Callable, Dict
 def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarray],
                                       X_ref : np.ndarray,
                                       M : int,
-                                      L : int) -> Callable[[np.ndarray, float], np.ndarray]:
+                                      L : int = 16) -> Callable[[np.ndarray, float], np.ndarray]:
+    """
+    Internal function to create the objective function for limit cycle continuation, 
+    starting from the initial (typically tiny) limit cycle `X_ref`.
+
+    Parameters
+    ----------
+    G : Callable
+        The original (steady-state) objective function. When the user wants limit
+        cycle continuation, `G` should be able to take a matrix as its first argument
+        and output the objective function for every row in the matrix.
+    X_ref : np.ndarray
+        The initial limit cycle on the branch, typically comes from `computeInitialLimitCycle` below.
+    M : int
+        The size of the state variable `u`.
+    L : int
+        The number of collocation points on the limit cycle. As a default, we represent 
+        the limit cycle in `L=16` points.
+
+    Returns
+    -------
+    GLC : Callable
+        Limit cycle objective function that inputs a M*L+1-dimensional array and 
+        the paramter `p` outputs vector of the same size.
+
+    """
     dtau = 1.0 / L
     X_ref = np.reshape(X_ref, (L, M))
     dX_ref_dtau = (np.roll(X_ref, shift=1, axis=0) - X_ref) / dtau
