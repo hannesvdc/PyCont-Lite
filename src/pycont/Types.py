@@ -46,7 +46,6 @@ class Branch:
 		ascending = (p_special >= self.p_path[0])
 		if ascending:
 			insert_index = np.searchsorted(self.p_path[0:self._index], p_special, side="right")
-			print()
 		else:
 			insert_index = np.searchsorted(-self.p_path[0:self._index], -p_special, side="right")
 
@@ -55,7 +54,6 @@ class Branch:
 		self.p_path[insert_index] = p_special
 		self.s_path[insert_index] = s
 		self._index = insert_index+1
-		print('index', insert_index)
 
 	def trim(self):
 		self.u_path = self.u_path[0:self._index,:]
