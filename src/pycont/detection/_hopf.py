@@ -334,8 +334,8 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
     # Use the BrentQ algorithm to find the alpha for which lambda is zero in real part. 
     # Start with a wide bracket because we increase accuracy for localizaiton, and the 
     # exact values of the eigenvalues may not match. 
-    alpha_left = -4.0
-    alpha_right = 5.0
+    alpha_left = -6.0
+    alpha_right = 7.0
     try:
         alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, xtol=10.0*nk_tolerance, maxiter=1000, full_output=True, disp=True)
     except ValueError:
