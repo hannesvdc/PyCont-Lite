@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- **Fast Hopf Updates** using the Jacobi-Davidson algorithm.
+- **Accurate Hopf localization** using the Jacobi-Davidson algorithm.
+
+### Changed
+- **Hysteresis for Hopf detection** after restarting from a prior Hopf point.
+
+## [0.5.0] - 2025-10-06
+
+### Added
 - **High-Precision Hopf Localization** after Hopf detection by means of precise eigenvalue computations.
 
 ### Changed
