@@ -5,6 +5,7 @@ import scipy.optimize as opt
 from . import ArclengthContinuation as pac
 from . import BranchSwitching as brs
 from . import Stability as stability
+from . import LimitCycle as lc
 from .detection import *
 from .Types import ContinuationResult, Event
 from .exceptions import InputError
@@ -80,6 +81,8 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             those with largest real part (initialized by `scipy.eigs(which='LR')`) will reliably detect
             a pair of complex conjugated eigenvalues crossing the imaginar axis. Increasing `n_hopf_eigenvalues` 
             will improve test reliability but come at a computational cost. 
+        - "limit_cycle_continuation" : bool (default True)
+            Whether to perform limit cycle continuation after a Hopf point was detected.
     verbosity : Verbosity or String or Int
         The level of verbosity required by the user. Can either be Verbosity.QUIET (1), Verbosity.INFO (2) or Verbosity.VERBOSE (3).
         Any string representation of these words will also be accepted.
@@ -158,6 +161,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     hopf_detection = sp.get("hopf_detection", False)
     if hopf_detection:
         detectionModules.append(HopfDetectionModule(G, u0, p0, sp))
+    sp.setdefault("limit_cycle_continuation", True)
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
@@ -311,9 +315,19 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
 
+        if sp["limit_cycle_continuation"]:
+            omega = termination_event.info["omega"]
+            eigvec = termination_event.info["eigvec"]
+            lc_init = lc.calculateInitialLimitCycle(G, sp, x_hopf, omega, eigvec, M)
+
+            if lc_init is None:
+                LOG.info("Initial Limit Cycle Calculation Failed, continuing along the Hopf branch.")
+            else:
+                lc_points_init, lc_T_init, lc_p_init = lc_init[0], lc_init[1], lc_init[2]
+
         # Add a tiny jump so we don't rediscover the same Hopf point again. Also project back to the path
         x_init = x_hopf + sp["s_jump"] * tangent
         p_init = x_init[M]
-        u_init = opt.newton_krylov(lambda u : G(u, p_init), x_init[0:M], rdiff=sp["rdiff"])
+        u_init = opt.newton_krylov(lambda u : G(u, p_init), x_init[0:M], rdiff=sp["rdiff"], maxiter=sp["nk_maxiter"])
         new_tangent = computeTangent(G, u_init, p_init, tangent, sp)
         _recursiveContinuation(G, u_init, p_init, new_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)

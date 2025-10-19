@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.optimize as opt
 
+from pycont.Types import Event
+
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
@@ -69,3 +71,6 @@ class ParamMaxDetectionModule(DetectionModule):
 
         # Return the full state at param_max
         return np.append(u_param_max, self.param_max_value)
+    
+    def addTerminationInfo(self, event: Event) -> Event:
+        return event

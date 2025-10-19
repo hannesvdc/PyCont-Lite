@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..Types import EventKind
+from ..Types import Event, EventKind
 
 import abc
 from typing import Callable, Dict, Any, Optional
@@ -104,5 +104,18 @@ class DetectionModule(abc.ABC):
         -------
         x_loc : ndarray
             Point on the branch where the detection function is exactly 0, up to the tolerance.
+        """
+        raise NotImplementedError
+    
+    @abc.abstractmethod
+    def addTerminationInfo(self, event : Event) -> Event:
+        """
+        Add important information to the branch termination event that 
+        is used in further calculations.
+
+        Returns
+        -------
+        Event
+            The termination event with extra information.
         """
         raise NotImplementedError

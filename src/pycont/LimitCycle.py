@@ -29,8 +29,8 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
                      p : float) -> np.ndarray:
         # Reshape X into rows
         assert len(U) == M * L
-        U = np.reshape(U, (L, M))
-        U_shifted = np.roll(U, shift=1, axis=0)
+        U = np.reshape(U, (M,L))
+        U_shifted = np.roll(U, shift=1, axis=1)
 
         X_alpha = 0.5 * (U + U_shifted)
         G_alpha = G(X_alpha, p)  # Assumes G can be evaluated for every row.
@@ -52,7 +52,8 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
     G : Callable
         The original (steady-state) objective function. When the user wants limit
         cycle continuation, `G` should be able to take a matrix as its first argument
-        and output the objective function for every row in the matrix.
+        and output the objective function for every column in the matrix. This naturally corresponds
+        to regular numpy indexing (`u[0]` can be a number of an entire row).
     U_ref : np.ndarray
         The initial limit cycle on the branch, typically comes from `calculateInitialLimitCycle` below.
     M : int
@@ -69,14 +70,14 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
 
     """
     dtau = 1.0 / L
-    U_ref = np.reshape(U_ref, (L, M))
-    dU_ref_dtau = (np.roll(U_ref, shift=1, axis=0) - U_ref) / dtau
+    U_ref = np.reshape(U_ref, (M,L))
+    dU_ref_dtau = (np.roll(U_ref, shift=1, axis=1) - U_ref) / dtau
     
     # Build the Continuation objective function
     ODEObjective = buildODEObjective(G, dtau, M, L)
     def phaseCondition(U : np.ndarray) -> float:
-        U = np.reshape(U, (L, M))
-        dU_dtau = (np.roll(U, shift=1, axis=0) - U) / dtau
+        U = np.reshape(U, (M,L))
+        dU_dtau = (np.roll(U, shift=1, axis=1) - U) / dtau
 
         inner_products  = np.sum(dU_dtau * dU_ref_dtau, axis=1)
         return np.sum(inner_products * dtau)
@@ -154,7 +155,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     # Compute the initial guess for the limit cycle
     tau = np.arange(L) / L
     T_init = 2.0 * np.pi / omega
-    U_init = u_hopf[np.newaxis,:] + rho * (np.outer(np.cos(2.0*np.pi*tau), qr) - np.outer(np.sin(2.0*np.pi*tau), qi))
+    U_init = u_hopf[:,np.newaxis] + rho * (np.outer(np.cos(2.0*np.pi*tau), qr) - np.outer(np.sin(2.0*np.pi*tau), qi))
     Q_init = np.append(U_init, T_init)
 
     # Try positive guess first

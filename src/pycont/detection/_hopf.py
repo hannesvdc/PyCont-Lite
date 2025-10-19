@@ -311,11 +311,11 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
                                w_left : np.ndarray,
                                w_right : np.ndarray,
                                M : int,
-                               sp : Dict) -> Tuple[bool, np.ndarray]:
+                               sp : Dict) -> Tuple[bool, np.ndarray, np.complex128, np.ndarray]:
     rdiff = sp["rdiff"]
     nk_tolerance = max(rdiff, sp['tolerance'])
 
-    def realPartHopfEigenvalue(alpha : float):
+    def hopfEigenpair(alpha : float) -> Tuple[np.complex128, np.ndarray]:
         # Build the Jacobian-vector product
         x = (1.0 - alpha) * x_left + alpha * x_right
         u = x[0:M]
@@ -326,8 +326,11 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
         lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right
         w_guess = (1.0 - alpha) * w_left + alpha * w_right
         lam, w = _JacobiDavidson(Jv, lam_guess, w_guess, tolerance='accurate')
+        return lam, w
 
+    def realPartHopfEigenvalue(alpha : float) -> float:
         # Compute the Rayleigh coefficient and return its real part
+        lam, _ = hopfEigenpair(alpha)
         LOG.verbose(f'Hopf Eigenvalue {np.real(lam)} at alpha = {alpha}')
         return np.real(lam)
     
@@ -339,10 +342,11 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
     try:
         alpha_hopf, result = opt.brentq(realPartHopfEigenvalue, alpha_left, alpha_right, xtol=10.0*nk_tolerance, maxiter=1000, full_output=True, disp=True)
     except ValueError:
-        return False, x_right
+        return False, x_right, lam_right, w_right
     except opt.NoConvergence:
-        return False, x_right
+        return False, x_right, lam_right, w_right
 
-    # Compute the lcoation of the Hopf point and return
+    # Compute the lcoation of the Hopf point and the associated eigenpair before returning.
     x_hopf = (1.0 - alpha_hopf) * x_left + alpha_hopf * x_right
-    return True, x_hopf
+    lam, eigvec = hopfEigenpair(alpha_hopf)
+    return True, x_hopf, lam, eigvec

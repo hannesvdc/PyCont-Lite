@@ -1,5 +1,7 @@
 import numpy as np
 
+from pycont.Types import Event
+
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
@@ -74,19 +76,26 @@ class HopfDetectionModule(DetectionModule):
         lead_eigval = self.new_state.eigvals[lead_index]
         lead_eigvec = self.new_state.eigvecs[:,lead_index]
 
-        is_hopf, hopf_point = localizeHopfJacobiDavidson(self.G, 
-                                                         self.prev_state.x, 
-                                                         self.new_state.x, 
-                                                         prev_eigval, 
-                                                         lead_eigval, 
-                                                         prev_eigvec, 
-                                                         lead_eigvec, 
-                                                         self.M, 
-                                                         self.sp)
+        is_hopf, hopf_point, lam_hopf, w_hopf = localizeHopfJacobiDavidson(self.G, 
+                                                                           self.prev_state.x, 
+                                                                           self.new_state.x, 
+                                                                           prev_eigval, 
+                                                                           lead_eigval, 
+                                                                           prev_eigvec, 
+                                                                           lead_eigvec, 
+                                                                           self.M, 
+                                                                           self.sp)
         if is_hopf:
             LOG.info(f'Hopf Point localized at {hopf_point}')
+            self.omega_hopf = np.imag(lam_hopf)
+            self.w_hopf = np.copy(w_hopf)
             return hopf_point
         
         LOG.info('Erroneous Hopf point detected, most likely due to inaccurate eigenvalue computations. Continuing along this branch.')
         self.prev_state = self.new_state
         return None
+    
+    def addTerminationInfo(self, event: Event) -> Event:
+        event.info["omega"] = self.omega_hopf
+        event.info["eigvec"] = self.w_hopf
+        return event

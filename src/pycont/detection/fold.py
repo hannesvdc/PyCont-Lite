@@ -1,5 +1,7 @@
 import numpy as np
 
+from pycont.Types import Event
+
 from .base import DetectionModule, ObjectiveType
 from ._fold import computeFoldPoint
 from ..Logger import LOG
@@ -52,3 +54,6 @@ class FoldDetectionModule(DetectionModule):
         LOG.info('Erroneous Fold Point detection due to blow-up in tangent vector.')
         self.prev_state = self.new_state
         return None
+    
+    def addTerminationInfo(self, event: Event) -> Event:
+        return event
