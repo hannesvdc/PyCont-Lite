@@ -316,13 +316,12 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         tangent = termination_event.info["tangent"]
 
         if sp["limit_cycle_continuation"]:
+            LOG.info('Initializing Limit Cycle near the Hopf point.')
             omega = termination_event.info["omega"]
             eigvec = termination_event.info["eigvec"]
             lc_init = lc.calculateInitialLimitCycle(G, sp, x_hopf, omega, eigvec, M)
 
-            if lc_init is None:
-                LOG.info("Initial Limit Cycle Calculation Failed, continuing along the Hopf branch.")
-            else:
+            if lc_init is not None:
                 lc_points_init, lc_T_init, lc_p_init = lc_init[0], lc_init[1], lc_init[2]
 
         # Add a tiny jump so we don't rediscover the same Hopf point again. Also project back to the path

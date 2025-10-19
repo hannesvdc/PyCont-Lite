@@ -30,10 +30,10 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
         # Reshape X into rows
         assert len(U) == M * L
         U = np.reshape(U, (M,L))
-        U_shifted = np.roll(U, shift=1, axis=1)
+        U_shifted = np.roll(U, shift=-1, axis=1)
 
         X_alpha = 0.5 * (U + U_shifted)
-        G_alpha = G(X_alpha, p)  # Assumes G can be evaluated for every row.
+        G_alpha = G(X_alpha, p)  # Assumes G can be evaluated for every column.
         
         R = U_shifted - U - dtau * T * G_alpha
         return R.flatten()
@@ -71,13 +71,13 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
     """
     dtau = 1.0 / L
     U_ref = np.reshape(U_ref, (M,L))
-    dU_ref_dtau = (np.roll(U_ref, shift=1, axis=1) - U_ref) / dtau
+    dU_ref_dtau = (np.roll(U_ref, shift=-1, axis=1) - U_ref) / dtau
     
     # Build the Continuation objective function
     ODEObjective = buildODEObjective(G, dtau, M, L)
     def phaseCondition(U : np.ndarray) -> float:
         U = np.reshape(U, (M,L))
-        dU_dtau = (np.roll(U, shift=1, axis=1) - U) / dtau
+        dU_dtau = (np.roll(U, shift=-1, axis=1) - U) / dtau
 
         inner_products  = np.sum(dU_dtau * dU_ref_dtau, axis=1)
         return np.sum(inner_products * dtau)
@@ -154,14 +154,16 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     
     # Compute the initial guess for the limit cycle
     tau = np.arange(L) / L
-    T_init = 2.0 * np.pi / omega
-    U_init = u_hopf[:,np.newaxis] + rho * (np.outer(np.cos(2.0*np.pi*tau), qr) - np.outer(np.sin(2.0*np.pi*tau), qi))
+    T_init = 2.0 * np.pi / np.abs(omega)
+    U_init = u_hopf[:,np.newaxis] + rho * (np.outer(qr, np.cos(2.0*np.pi*tau)) - np.outer(qi, np.sin(2.0*np.pi*tau)))
     Q_init = np.append(U_init, T_init)
+    print('U_init', U_init)
 
     # Try positive guess first
     p_init = p_hopf + rho**2
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], f_tol=sp["tolerance"])
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], verbose=True)
+        print('LC Found', QLC[:-1], QLC[-1])
         return QLC[:-1], QLC[-1], p_init
     except opt.NoConvergence:
         LOG.verbose('Initial guess for the limit cycle failed. Trying different sign of p.')
@@ -169,7 +171,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     # If it failed, try a negative guess
     p_init = p_hopf - rho**2
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], f_tol=sp["tolerance"])
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], verbose=True)
     except opt.NoConvergence:
         LOG.info('Initializing the Limit Cylce failed. Not doing running continuation on this branch.')
         return None

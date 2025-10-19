@@ -137,6 +137,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 				# Quit continuation and return to main driver.
 				termination_event = Event(module.kind, special_point[0:M], special_point[M], s_special, info={"tangent" : np.copy(new_tangent)})
+				termination_event = module.addTerminationInfo(termination_event)
 				branch.addSpecialPoint(special_point, s_special)
 				branch.termination_event = termination_event
 				return branch.trim(), termination_event
