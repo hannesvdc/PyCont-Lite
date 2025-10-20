@@ -266,6 +266,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     # Do regular continuation on this branch
     branch, termination_event = pac.continuation(G, u0, p0, tangent, ds_min, ds_max, ds, n_steps, branch_id, detectionModules, sp)
     branch.from_event = from_event
+    branch.is_lc = False
     result.branches.append(branch)
     result.events.append(termination_event)
     termination_event_index = len(result.events)-1
@@ -315,18 +316,60 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         x_hopf = np.append(termination_event.u, termination_event.p)
         tangent = termination_event.info["tangent"]
 
-        if sp["limit_cycle_continuation"]:
-            LOG.info('Initializing Limit Cycle near the Hopf point.')
-            omega = termination_event.info["omega"]
-            eigvec = termination_event.info["eigvec"]
-            lc_init = lc.calculateInitialLimitCycle(G, sp, x_hopf, omega, eigvec, M)
-
-            if lc_init is not None:
-                lc_points_init, lc_T_init, lc_p_init = lc_init[0], lc_init[1], lc_init[2]
-
         # Add a tiny jump so we don't rediscover the same Hopf point again. Also project back to the path
         x_init = x_hopf + sp["s_jump"] * tangent
         p_init = x_init[M]
         u_init = opt.newton_krylov(lambda u : G(u, p_init), x_init[0:M], rdiff=sp["rdiff"], maxiter=sp["nk_maxiter"])
         new_tangent = computeTangent(G, u_init, p_init, tangent, sp)
         _recursiveContinuation(G, u_init, p_init, new_tangent, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
+
+        # Do LC continuation af the very end.
+        if sp["limit_cycle_continuation"]:
+            _limitCylceContinuation(G, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+
+def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
+                            ds_min : float, 
+                            ds_max : float, 
+                            ds : float, 
+                            n_steps : int, 
+                            sp : Dict[str, Any],
+                            from_event : int,
+                            result : ContinuationResult) -> None:
+    LOG.info('Initializing Limit Cycle near the Hopf point.')
+    hopf_event = result.events[from_event]
+    branch_id = len(result.branches)
+
+    M = len(hopf_event.u)
+    x_hopf = np.append(hopf_event.u, hopf_event.p)
+    omega = hopf_event.info["omega"]
+    eigvec = hopf_event.info["eigvec"]
+    lc_init = lc.calculateInitialLimitCycle(G, sp, x_hopf, omega, eigvec, M)
+
+    if lc_init is None:
+        return
+    
+    lc_points_init, lc_T_init, lc_p_init = lc_init
+    Q_init = np.append(lc_points_init, lc_T_init)
+    G_lc = lc.createLimitCycleObjectiveFunction(G, lc_points_init, M)
+
+    # Calculate the iniital tangent along this branch. 
+    LOG.info('\nComputing Initial Tangent to the Limit Cycle Branch.')
+    rdiff = sp["rdiff"]
+    with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
+        try:
+            Q1 = opt.newton_krylov(lambda uu: G_lc(uu, lc_p_init + rdiff), Q_init, rdiff=rdiff)
+        except opt.NoConvergence:
+            raise InputError("Initial tangent computation failed.")
+    initial_tangent = (Q1 - Q_init) / rdiff
+    initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
+    tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp)
+    
+    # Perform limit cycle continuation
+    lcDetectionModules = []
+    lc_branch, lc_termination_event = pac.continuation(G_lc, Q_init, lc_p_init, tangent, ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp)
+
+    # Append the LC branch to the list of branches and return.
+    lc_branch.from_event = from_event
+    lc_branch.is_lc = True
+    result.branches.append(lc_branch)
+    result.events.append(lc_termination_event)
