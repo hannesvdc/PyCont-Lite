@@ -121,14 +121,17 @@ def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
                     tolerance : str) -> Tuple[np.complex128, np.ndarray]:
     M = len(v0)
     if tolerance == 'accurate':
-        tol = 1e-8
+        tol = 1e-4
         maxiter = 1000
+        verbose=True
     else: # 1 NK step = 1 LGMRES solve but better.
-        tol = 1e-3
-        maxiter = 1
+        tol = 1e-3 #1e-3
+        maxiter = 1 #1
+        verbose=False
 
     v = np.copy(v0)
     lam = lam0
+    print('lambda guess', lam0)
     for iter in range(3):
 
         # Compute the residual and break if it is small enough
@@ -141,11 +144,12 @@ def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
         P = lambda w : w - v * np.vdot(v, w)
         J_reduced = lambda w : P(J_mv(P(w)))
         try:
-            s = opt.newton_krylov(lambda w : J_reduced(w) + P(r), np.zeros_like(v), f_tol=tol, maxiter=maxiter)
+            s = opt.newton_krylov(lambda w : J_reduced(w) + P(r), np.zeros_like(v), f_tol=tol, verbose=verbose)
         except opt.NoConvergence as e:
             s = e.args[0]
-        except ValueError:
+        except:
             # Solve using L-GMRES if newton_krylov fails
+            print('lgmres')
             s, info = slg.lgmres(slg.LinearOperator((M,M), J_reduced), -P(r), atol=tol)
         LOG.verbose(f"JD Residual {np.linalg.norm(J_reduced(s)+P(r))}")
 
@@ -320,7 +324,7 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
         x = (1.0 - alpha) * x_left + alpha * x_right
         u = x[0:M]
         p = x[M]
-        Jv = lambda v : (G(u + rdiff * v, p) - G(u - rdiff * v, p)) / rdiff
+        Jv = lambda v : (G(u + rdiff * v, p) - G(u - rdiff * v, p)) / (2.0 * rdiff)
 
         # Build the linear system to solve for the complex eigenvalue
         lam_guess = (1.0 - alpha) * lam_left + alpha * lam_right

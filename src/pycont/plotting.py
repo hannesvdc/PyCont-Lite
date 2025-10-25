@@ -40,12 +40,12 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
             # Plot u(t)[0] versus u(t)[1]
             npoints = branch.u_path.shape[0]
             L = (branch.u_path.shape[1]-1) // M
-            Q_points = np.reshape(branch.u_path[:,:-1], (npoints, M, L))
+            Q_points = np.reshape(branch.u_path[:,:-1], (npoints, M, L), 'F')
             p_values = branch.p_path
             branch.from_event
 
             if branch.from_event is not None:
-                hopf_location = cr.events[int(branch.from_event)].u
+                hopf_location = cr.events[int(branch.from_event)].p
             else:
                 hopf_location = None
             _plotLimitCycleFamily(Q_points, p_values, hopf_location)
@@ -70,7 +70,7 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
 
     plt.show()	
 
-def _plotLimitCycleFamily(Q_points, p_values, u_hopf):
+def _plotLimitCycleFamily(Q_points, p_values, p_hopf):
     u0_t = Q_points[:,0,:]
     u1_t = Q_points[:,1,:]
 
@@ -95,5 +95,5 @@ def _plotLimitCycleFamily(Q_points, p_values, u_hopf):
 
     ax.set_xlabel(r'$u_0(t)$')
     ax.set_ylabel(r'$u_1(t)$')
-    if u_hopf is not None:
-        ax.set_title(rf'Limit Cycles from Hopf Point $({u_hopf[0]}, {u_hopf[1]})$')
+    if p_hopf is not None:
+        ax.set_title(rf'Limit Cycles from Hopf Point $p = {round(p_hopf,4)}$')

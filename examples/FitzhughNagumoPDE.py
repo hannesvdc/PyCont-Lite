@@ -2,6 +2,7 @@ import pathlib
 
 import numpy as np
 import scipy.optimize as opt
+import matplotlib.pyplot as plt
 
 import pycont
 
@@ -61,8 +62,18 @@ def FitzhughNagumoTest():
     ds_min = 1e-6
     ds0 = 1e-3
     n_steps = 1000
-    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
-    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters)
+    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True, 'initial_directions': 'decrease_p'}
+    continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters, verbosity='verbose')
+
+    # Extract the initial limit cycle and plot it versus x
+    Q_lc = None
+    for branch in continuation_result.branches:
+        if not branch.is_lc:
+            continue
+        Q_lc = branch.u_path[0,:]
+        L_lc = (len(Q_lc) - 1) // N 
+        U_values = np.reshape(Q_lc[:-1], (N,L_lc), 'F')
+        plt.plot(x, U_values)
 
     # Plot the bifurcation diagram eps versus <u>
     u_transform = lambda z: np.average(z[:N])

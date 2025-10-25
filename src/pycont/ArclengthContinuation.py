@@ -20,7 +20,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
                  n_steps : int,
 				 branch_id : int,
 				 detectionModules : List[DetectionModule],
-                 sp : Dict[str, Any]) -> Tuple[Branch, Event]:
+                 sp : Dict[str, Any],
+				 high_accuracy : bool = True) -> Tuple[Branch, Event]:
 	
 	"""
     Function that performs the actual pseudo-arclength continuation of the current branch. It starts
@@ -70,7 +71,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]
 	a_tol = sp["tolerance"]
-	nk_tolerance = max(a_tol, r_diff)
+	nk_tolerance = max(a_tol, r_diff) if high_accuracy else 1e-2
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
@@ -119,7 +120,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			return branch.trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
-		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
+		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp, high_accuracy=high_accuracy)
 		
 		# Go through all detection modules and check if we passed an important point
 		if n % 5 == 0:

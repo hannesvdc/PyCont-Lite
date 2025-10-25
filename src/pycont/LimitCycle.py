@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.optimize as opt
+import math
 
 from .Logger import LOG
 
@@ -11,7 +12,7 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
                       L : int) -> Callable[[np.ndarray,float,float],np.ndarray]:
     """ 
     Internal helper function that returns the limit cycle ODE objective function.
-    It only requires the origianl objective function and time-discretization parameters.
+    It only requires the original objective function and time-discretization parameters.
 
     Parameters
     ----------
@@ -29,20 +30,20 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
                      p : float) -> np.ndarray:
         # Reshape X into rows
         assert len(U) == M * L
-        U = np.reshape(U, (M,L))
+        U = np.reshape(U, (M,L), 'F')
         U_shifted = np.roll(U, shift=-1, axis=1)
 
         X_alpha = 0.5 * (U + U_shifted)
-        G_alpha = G(X_alpha, p)  # Assumes G can be evaluated for every column.
-        
+        G_alpha = np.apply_along_axis(lambda u: G(u, p), 0, X_alpha)
+
         R = U_shifted - U - dtau * T * G_alpha
-        return R.flatten()
+        return R.flatten('F')
     return ODEObjective
 
 def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarray],
                                       U_ref : np.ndarray,
                                       M : int,
-                                      L : int = 16) -> Callable[[np.ndarray, float], np.ndarray]:
+                                      L : int = 512) -> Callable[[np.ndarray, float], np.ndarray]:
     """
     Internal function to create the objective function for limit cycle continuation, 
     starting from the initial (typically tiny) limit cycle `X_ref`.
@@ -50,10 +51,7 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
     Parameters
     ----------
     G : Callable
-        The original (steady-state) objective function. When the user wants limit
-        cycle continuation, `G` should be able to take a matrix as its first argument
-        and output the objective function for every column in the matrix. This naturally corresponds
-        to regular numpy indexing (`u[0]` can be a number of an entire row).
+        The original (steady-state) objective function.
     U_ref : np.ndarray
         The initial limit cycle on the branch, typically comes from `calculateInitialLimitCycle` below.
     M : int
@@ -70,13 +68,13 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
 
     """
     dtau = 1.0 / L
-    U_ref = np.reshape(U_ref, (M,L))
+    U_ref = np.reshape(U_ref, (M,L), 'F')
     dU_ref_dtau = (np.roll(U_ref, shift=-1, axis=1) - U_ref) / dtau
     
     # Build the Continuation objective function
     ODEObjective = buildODEObjective(G, dtau, M, L)
     def phaseCondition(U : np.ndarray) -> float:
-        U = np.reshape(U, (M,L))
+        U = np.reshape(U, (M,L), 'F')
         dU_dtau = (np.roll(U, shift=-1, axis=1) - U) / dtau
 
         inner_products  = np.sum(dU_dtau * dU_ref_dtau, axis=1)
@@ -95,7 +93,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
                                omega : float,
                                eigvec : np.ndarray,
                                M : int,
-                               L : int = 16,
+                               L : int = 512,
                                rho : float = 0.01) -> Optional[Tuple[np.ndarray, float, float]]:
     """
     Calculate the initial limit cycle close to the Hopf bifurcation point.
@@ -103,9 +101,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     Parameters
     ----------
     G : Callable
-        The original (steady-state) objective function. When the user wants limit
-        cycle continuation, `G` should be able to take a matrix as its first argument
-        and output the objective function for every row in the matrix.
+        The original (steady-state) objective function.
     sp : Dict
         Solver parameters.
     x_hopf : ndarray
@@ -135,6 +131,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     p_hopf = x_hopf[M]
 
     # Orthogonalize the real and imaginary components of `eigvec`.
+    print('omega', omega, np.linalg.norm(np.real(eigvec)), np.linalg.norm(np.imag(eigvec)))
     qr = np.real(eigvec)
     qi = np.imag(eigvec)
     qr = qr / np.linalg.norm(qr)
@@ -155,25 +152,35 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     # Compute the initial guess for the limit cycle
     tau = np.arange(L) / L
     T_init = 2.0 * np.pi / np.abs(omega)
-    U_init = u_hopf[:,np.newaxis] + rho * (np.outer(qr, np.cos(2.0*np.pi*tau)) - np.outer(qi, np.sin(2.0*np.pi*tau)))
-    Q_init = np.append(U_init, T_init)
-    print('U_init', U_init)
+    U_init = u_hopf[:,np.newaxis] + rho * (np.outer(qr, np.cos(2.0*np.pi*tau)) - np.outer(np.sign(omega)*qi, np.sin(2.0*np.pi*tau)))
+    Q_init = np.append(U_init.flatten('F'), T_init)
+    print('U_init', U_init, U_init.shape)
+    print('Q_init', Q_init)
 
     # Try positive guess first
     p_init = p_hopf + rho**2
+    rms = math.sqrt(M * L + 1.0)
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], verbose=True)
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], verbose=True, maxiter=50)
+        print('QLC found', QLC)
+        if QLC[-1] < 0.0 or np.any(np.isnan(QLC)) or np.any(np.isinf(QLC)):
+            raise ValueError()
         print('LC Found', QLC[:-1], QLC[-1])
         return QLC[:-1], QLC[-1], p_init
     except opt.NoConvergence:
-        LOG.verbose('Initial guess for the limit cycle failed. Trying different sign of p.')
+        print('noconvergence')
+        LOG.info('Initial guess for the limit cycle failed. Trying different sign of p.')
+    except ValueError:
+        print('valueerror')
+        LOG.info('Initial guess for the limit cycle failed. Trying different sign of p.')
         
     # If it failed, try a negative guess
     p_init = p_hopf - rho**2
+    print('Trying again')
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, rdiff=sp["rdiff"], verbose=True)
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], verbose=True, maxiter=50)
     except opt.NoConvergence:
-        LOG.info('Initializing the Limit Cylce failed. Not doing running continuation on this branch.')
+        LOG.info('Initializing the Limit Cylce failed. Not donig limit cycle continuation around this Hopf point.')
         return None
 
     # Return the initial limit cycle parameters
