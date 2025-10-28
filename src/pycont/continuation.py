@@ -349,7 +349,6 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         return
     
     lc_points_init, lc_T_init, lc_p_init = lc_init
-    pdir = np.sign(lc_p_init - x_hopf[M])
     Q_init = np.append(lc_points_init, lc_T_init)
     G_lc = lc.createLimitCycleObjectiveFunction(G, lc_points_init, M)
 
@@ -358,16 +357,16 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     rdiff = sp["rdiff"]
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         try:
-            Q1 = opt.newton_krylov(lambda uu: G_lc(uu, lc_p_init + pdir * rdiff), Q_init, rdiff=rdiff, maxiter=2)
+            Q1 = opt.newton_krylov(lambda uu: G_lc(uu, lc_p_init + rdiff), Q_init, rdiff=rdiff, maxiter=2)
         except opt.NoConvergence as e:
             Q1 = e.args[0]
-    initial_tangent = (Q1 - Q_init) / (pdir * rdiff)
+    initial_tangent = (Q1 - Q_init) / (rdiff)
     initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
-    tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp, high_accuracy=False)
+    tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp, high_accuracy=True)
     
     # Perform limit cycle continuation
     lcDetectionModules = []
-    lc_branch, lc_termination_event = pac.continuation(G_lc, Q_init, lc_p_init, -tangent, ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp, high_accuracy=False)
+    lc_branch, lc_termination_event = pac.continuation(G_lc, Q_init, lc_p_init, tangent, ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp, high_accuracy=True)
 
     # Append the LC branch to the list of branches and return.
     lc_branch.from_event = from_event
