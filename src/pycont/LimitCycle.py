@@ -43,7 +43,7 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
 def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarray],
                                       U_ref : np.ndarray,
                                       M : int,
-                                      L : int = 512) -> Callable[[np.ndarray, float], np.ndarray]:
+                                      L : int = 256) -> Callable[[np.ndarray, float], np.ndarray]:
     """
     Internal function to create the objective function for limit cycle continuation, 
     starting from the initial (typically tiny) limit cycle `X_ref`.
@@ -73,12 +73,10 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
     
     # Build the Continuation objective function
     ODEObjective = buildODEObjective(G, dtau, M, L)
-    def phaseCondition(U : np.ndarray) -> float:
-        U = np.reshape(U, (M,L), 'F')
-        dU_dtau = (np.roll(U, shift=-1, axis=1) - U) / dtau
+    def phaseCondition(U_flat):
+        U = np.reshape(U_flat, (M, L), order='F')
+        return float(((U - U_ref) * dU_ref_dtau).sum() * dtau)
 
-        inner_products  = np.sum(dU_dtau * dU_ref_dtau, axis=1)
-        return np.sum(inner_products * dtau)
     def GLC(Q : np.ndarray,
             p : float):
         U = Q[:-1]
@@ -93,7 +91,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
                                omega : float,
                                eigvec : np.ndarray,
                                M : int,
-                               L : int = 512,
+                               L : int = 256,
                                rho : float = 0.01) -> Optional[Tuple[np.ndarray, float, float]]:
     """
     Calculate the initial limit cycle close to the Hopf bifurcation point.

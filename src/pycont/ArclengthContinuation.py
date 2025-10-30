@@ -71,7 +71,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]
 	a_tol = sp["tolerance"]
-	nk_tolerance = max(a_tol, r_diff) if high_accuracy else 1e-2
+	nk_tolerance = max(a_tol, r_diff) if high_accuracy else 1e-4
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)

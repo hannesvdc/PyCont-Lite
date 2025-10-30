@@ -38,9 +38,8 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
     for branch in cr.branches:
         if branch.is_lc:
             # Plot u(t)[0] versus u(t)[1]
-            npoints = branch.u_path.shape[0]
-            L = (branch.u_path.shape[1]-1) // M
-            Q_points = np.reshape(branch.u_path[:,:-1], (npoints, M, L), 'F')
+            Q_points = branch.u_path[:,:-1]
+            T_values = branch.u_path[:,-1]
             p_values = branch.p_path
             branch.from_event
 
@@ -48,7 +47,7 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
                 hopf_location = cr.events[int(branch.from_event)].p
             else:
                 hopf_location = None
-            _plotLimitCycleFamily(Q_points, p_values, hopf_location)
+            _plotLimitCycleFamily(Q_points, T_values, p_values, hopf_location, M)
 
         else:
             u_vals = np.apply_along_axis(u_transform, 1, branch.u_path)
@@ -70,23 +69,27 @@ def plotBifurcationDiagram(cr : ContinuationResult, **kwargs) -> None:
 
     plt.show()	
 
-def _plotLimitCycleFamily(Q_points, p_values, p_hopf):
-    u0_t = Q_points[:,0,:]
-    u1_t = Q_points[:,1,:]
+def _plotLimitCycleFamily(Q_points, T_values, p_values, p_hopf, M):
+    L = len(Q_points[0,:]) // M
 
     fig, ax = plt.subplots()
     norm = Normalize(p_values.min(), p_values.max())
     cmap = 'plasma'
     cm = plt.get_cmap(cmap)
+    print(T_values)
 
+    n_points = Q_points.shape[0]
     stride = 10
-    for k in range(0, u0_t.shape[0], stride):
-        x = u0_t[k]; y = u1_t[k]
+    for k in range(5, n_points, stride): # Ignore the first few unstable limit cycles
+        Q = Q_points[k,:]
+        ut = np.reshape(Q, (M,L), 'F')
+        x = ut[0,:]
+        y = ut[1,:]
 
         # close the loop for plotting aesthetics
-        x_plot = np.r_[x, x[0]]; y_plot = np.r_[y, y[0]]
+#        x_plot = np.r_[x, x[0]]; y_plot = np.r_[y, y[0]]
         color = cm(norm(p_values[k]))
-        ax.plot(x_plot, y_plot, color=color)
+        ax.plot(x, y, color=color)
 
     # Add a colorbar
     sm = ScalarMappable(norm=norm, cmap=cm)

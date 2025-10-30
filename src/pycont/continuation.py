@@ -351,22 +351,35 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     lc_points_init, lc_T_init, lc_p_init = lc_init
     Q_init = np.append(lc_points_init, lc_T_init)
     G_lc = lc.createLimitCycleObjectiveFunction(G, lc_points_init, M)
+    
+    # Solve G_lc again with the new initial guess (Q_init, lc_p_init)
+    print('Solving initial LC again with new objective function')
+    rdiff = sp["rdiff"]
+    try:
+        Q_init = opt.newton_krylov(lambda q : G_lc(q, lc_p_init), Q_init, rdiff=rdiff, f_tol=1e-4, verbose=True)
+    except opt.NoConvergence as e:
+        Q_init = e.args[0]
+    print('More accurate initial limit cycle: ', Q_init)
 
     # Calculate the iniital tangent along this branch. 
     LOG.info('\nComputing Initial Tangent to the Limit Cycle Branch.')
-    rdiff = sp["rdiff"]
+    p_dir = np.sign(lc_p_init - hopf_event.p)
+    p1 = lc_p_init + 0.01*p_dir
+    print(hopf_event.p, lc_p_init, p_dir, p1)
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         try:
-            Q1 = opt.newton_krylov(lambda uu: G_lc(uu, lc_p_init + rdiff), Q_init, rdiff=rdiff, maxiter=2)
+            Q1 = opt.newton_krylov(lambda q: G_lc(q, p1), Q_init, rdiff=rdiff, f_tol=1e-4)
         except opt.NoConvergence as e:
             Q1 = e.args[0]
-    initial_tangent = (Q1 - Q_init) / (rdiff)
-    initial_tangent = np.append(initial_tangent, 1.0); initial_tangent = initial_tangent / lg.norm(initial_tangent)
-    tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp, high_accuracy=True)
+    initial_tangent = (Q1 - Q_init) / (p1 - lc_p_init)
+    initial_tangent = np.append(initial_tangent, p_dir); initial_tangent = initial_tangent / lg.norm(initial_tangent)
+    tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp, high_accuracy=False)
+    print('tangent final component', tangent[-1])
+    print('Initial G value', lg.norm(G_lc(Q1, p1)))
     
     # Perform limit cycle continuation
     lcDetectionModules = []
-    lc_branch, lc_termination_event = pac.continuation(G_lc, Q_init, lc_p_init, tangent, ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp, high_accuracy=True)
+    lc_branch, lc_termination_event = pac.continuation(G_lc, Q1, p1, tangent, 0.1*ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp, high_accuracy=False)
 
     # Append the LC branch to the list of branches and return.
     lc_branch.from_event = from_event
