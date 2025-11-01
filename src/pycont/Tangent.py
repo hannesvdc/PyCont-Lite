@@ -11,7 +11,8 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 				   u : np.ndarray, 
 				   p : float, 
 				   prev_tangent : np.ndarray, 
-				   sp : Dict) -> np.ndarray:
+				   sp : Dict,
+                   high_accuracy : bool = True) -> np.ndarray:
     rdiff = sp["rdiff"]
     M = len(u)
 
@@ -32,7 +33,7 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
     tangent, info = slg.lgmres(sys, rhs, x0=prev_tangent, maxiter=min(M+2, 10))
     tangent_residual = lg.norm(sys(tangent) - rhs)
     LOG.verbose(f'Tangent LGMRES Residual {tangent_residual}, {info}')
-    if tangent_residual > 0.01:
+    if high_accuracy and tangent_residual > 0.01:
         # Solve the linear system using Newton-Krylov with much better lgmres arguments
         def F(v):
             return matvec(v) - rhs

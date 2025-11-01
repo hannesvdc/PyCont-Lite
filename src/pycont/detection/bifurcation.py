@@ -1,5 +1,7 @@
 import numpy as np
 
+from pycont.Types import Event
+
 from .base import DetectionModule, ObjectiveType
 from ._bifurcation import test_fn_jacobian_multi, computeBifurcationPoint
 from ..Logger import LOG
@@ -119,3 +121,6 @@ class BifurcationDetectionModule(DetectionModule):
         LOG.info('Erroneous sign change in bifurcation detection, most likely due to blowup. Continuing along this branch.')
         self.prev_state = self.new_state
         return None
+    
+    def addTerminationInfo(self, event: Event) -> Event:
+        return event

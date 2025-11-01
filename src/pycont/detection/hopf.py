@@ -1,9 +1,11 @@
 import numpy as np
 
+from pycont.Types import Event
+
 from .base import DetectionModule, ObjectiveType
 from ..Logger import LOG
 from ..exceptions import InputError
-from ._hopf import initializeHopf, refreshHopf, detectHopf, localizeHopf
+from ._hopf import initializeHopf, detectHopf, refreshHopfJacobiDavidson, localizeHopfJacobiDavidson
 
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional, Any
@@ -40,6 +42,8 @@ class HopfDetectionModule(DetectionModule):
                          x : np.ndarray,
                          tangent : np.ndarray) -> None:
         eigvals, eigvecs, lead = initializeHopf(self.G, x[0:self.M], x[self.M], self.n_hopf_eigenvalues, self.sp)
+        self.in_confident_region = (np.abs(np.real(eigvals[lead])) > 3e-3)
+
         self.prev_state = HopfState(np.copy(x), eigvals, eigvecs, lead)
 
     def update(self,
@@ -48,20 +52,23 @@ class HopfDetectionModule(DetectionModule):
                tangent_new : np.ndarray) -> bool:
         u_new = x_new[0:self.M]
         p_new = x_new[self.M]
-        eigvals, eigvecs, lead = refreshHopf(self.G, u_new, p_new, self.prev_state.eigvals, self.prev_state.eigvecs, self.sp)
+        eigvals, eigvecs, lead = refreshHopfJacobiDavidson(self.G, u_new, p_new, self.prev_state.eigvals, self.prev_state.eigvecs, self.sp)
         self.new_state = HopfState(np.copy(x_new), eigvals, eigvecs, lead)
 
         # If we passed a Hopf point, return True for localization.
         is_hopf = detectHopf(self.prev_state.eigvals, self.new_state.eigvals, self.prev_state.lead, self.new_state.lead)
-        if is_hopf:
+        if self.in_confident_region and is_hopf:
             LOG.info(f"Hopf Point Detected near {x_new}.")
             return True
         
         # Else, update the internal state
         self.prev_state = self.new_state
+        self.in_confident_region = self.in_confident_region or (np.abs(np.real(self.prev_state.eigvals[self.prev_state.lead])) > 3e-3)
         return False
     
     def localize(self) -> Optional[np.ndarray]:
+        LOG.info(f"Localizing the Hopf Point")
+
         prev_lead_index = self.prev_state.lead
         prev_eigval = self.prev_state.eigvals[prev_lead_index]
         prev_eigvec = self.prev_state.eigvecs[:,prev_lead_index]
@@ -69,11 +76,26 @@ class HopfDetectionModule(DetectionModule):
         lead_eigval = self.new_state.eigvals[lead_index]
         lead_eigvec = self.new_state.eigvecs[:,lead_index]
 
-        is_hopf, hopf_point = localizeHopf(self.G, self.prev_state.x, self.new_state.x, prev_eigval, lead_eigval, prev_eigvec, lead_eigvec, self.M, self.sp)
+        is_hopf, hopf_point, lam_hopf, w_hopf = localizeHopfJacobiDavidson(self.G, 
+                                                                           self.prev_state.x, 
+                                                                           self.new_state.x, 
+                                                                           prev_eigval, 
+                                                                           lead_eigval, 
+                                                                           prev_eigvec, 
+                                                                           lead_eigvec, 
+                                                                           self.M, 
+                                                                           self.sp)
         if is_hopf:
             LOG.info(f'Hopf Point localized at {hopf_point}')
+            self.omega_hopf = np.imag(lam_hopf)
+            self.w_hopf = np.copy(w_hopf)
             return hopf_point
         
         LOG.info('Erroneous Hopf point detected, most likely due to inaccurate eigenvalue computations. Continuing along this branch.')
         self.prev_state = self.new_state
         return None
+    
+    def addTerminationInfo(self, event: Event) -> Event:
+        event.info["omega"] = self.omega_hopf
+        event.info["eigvec"] = self.w_hopf
+        return event

@@ -17,7 +17,7 @@ with **automatic bifurcation detection, branch switching, and stability analysis
 - **Branch switching**: continues all discovered branches recursively.  
 - **Stability analysis**: computes leading eigenvalues to distinguish stable vs. unstable segments.  
 - **Lightweight plotting**: quickly visualize bifurcation diagrams with `plotBifurcationDiagram`. Plots automatically distinguish stable vs. unstable branches.
-- **Structured output**: branches (with stability) and events (folds, bifurcations) are returned for further analysis.”
+- **Structured output**: branches (with stability) and events (folds, bifurcations) are returned for further analysis.
 
 ## Installation & Requirements
 PyCont-Lite requires only:

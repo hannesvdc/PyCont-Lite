@@ -2,6 +2,7 @@ import pathlib
 
 import numpy as np
 import scipy.optimize as opt
+import matplotlib.pyplot as plt
 
 import pycont
 
@@ -56,12 +57,12 @@ def FitzhughNagumoTest():
 
     # Do continuation. The Fitzhugh-Nagumo equations are much worse conditioned than the Bratu PDE because
     # the Jacbian is very non-normal. We must use a small tolerance.
-    tolerance = 1e-9
+    tolerance = 1e-10
     ds_max = 0.01
     ds_min = 1e-6
     ds0 = 1e-3
     n_steps = 1000
-    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
+    solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True, "limit_cycle_continuation" : False}
     continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters)
 
     # Plot the bifurcation diagram eps versus <u>

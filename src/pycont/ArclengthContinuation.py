@@ -20,7 +20,8 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
                  n_steps : int,
 				 branch_id : int,
 				 detectionModules : List[DetectionModule],
-                 sp : Dict[str, Any]) -> Tuple[Branch, Event]:
+                 sp : Dict[str, Any],
+				 high_accuracy : bool = True) -> Tuple[Branch, Event]:
 	
 	"""
     Function that performs the actual pseudo-arclength continuation of the current branch. It starts
@@ -70,7 +71,7 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 	max_it = sp["nk_maxiter"]
 	r_diff = sp["rdiff"]
 	a_tol = sp["tolerance"]
-	nk_tolerance = max(a_tol, r_diff)
+	nk_tolerance = max(a_tol, r_diff) if high_accuracy else 1e-4
 
 	# Initialize a point on the path
 	x = np.append(u0, p0)
@@ -116,10 +117,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 			LOG.info('Minimal Arclength Size is too large. Aborting.')
 			termination_event = Event("DSFLOOR", x[0:M], x[M], s)
 			branch.termination_event = termination_event
-			return branch.commit().trim(), termination_event
+			return branch.trim(), termination_event
 		
 		# Determine the tangent to the curve at current point
-		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp)
+		new_tangent = computeTangent(G, x_new[0:M], x_new[M], tangent, sp, high_accuracy=high_accuracy)
 		
 		# Go through all detection modules and check if we passed an important point
 		if n % 5 == 0:
@@ -137,18 +138,16 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 				# Quit continuation and return to main driver.
 				termination_event = Event(module.kind, special_point[0:M], special_point[M], s_special, info={"tangent" : np.copy(new_tangent)})
-				branch.addPoint(special_point, s_special)
+				termination_event = module.addTerminationInfo(termination_event)
+				branch.addSpecialPoint(special_point, s_special)
 				branch.termination_event = termination_event
 				return branch.trim(), termination_event
-			
-			# Commit all tentative points on the current branch if no special point was passed
-			branch.commit()
 		
 		# Bookkeeping for the next step
 		tangent = np.copy(new_tangent)
 		x = np.copy(x_new)
 		s = new_s
-		branch.addPointTentative(x, s)
+		branch.addPoint(x, s)
 		
 		# Print the status
 		print_str = f"Step n: {n:3d}\t u: {lg.norm(x[0:M]):.4f}\t p: {x[M]:.4f}\t s: {s:.4f}\t t_p: {tangent[M]:.4f}"
@@ -156,4 +155,4 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
 
 	termination_event = Event("MAXSTEPS", branch.u_path[-1,:], branch.p_path[-1], branch.s_path[-1])
 	branch.termination_event = termination_event
-	return branch.commit().trim(), termination_event
+	return branch.trim(), termination_event
