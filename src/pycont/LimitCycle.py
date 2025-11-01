@@ -43,7 +43,7 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
 def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarray],
                                       U_ref : np.ndarray,
                                       M : int,
-                                      L : int = 256) -> Callable[[np.ndarray, float], np.ndarray]:
+                                      L : int = 512) -> Callable[[np.ndarray, float], np.ndarray]:
     """
     Internal function to create the objective function for limit cycle continuation, 
     starting from the initial (typically tiny) limit cycle `X_ref`.
@@ -91,7 +91,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
                                omega : float,
                                eigvec : np.ndarray,
                                M : int,
-                               L : int = 256,
+                               L : int = 512,
                                rho : float = 0.01) -> Optional[Tuple[np.ndarray, float, float]]:
     """
     Calculate the initial limit cycle close to the Hopf bifurcation point.
@@ -129,7 +129,6 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     p_hopf = x_hopf[M]
 
     # Orthogonalize the real and imaginary components of `eigvec`.
-    print('omega', omega, np.linalg.norm(np.real(eigvec)), np.linalg.norm(np.imag(eigvec)))
     qr = np.real(eigvec)
     qi = np.imag(eigvec)
     qr = qr / np.linalg.norm(qr)
@@ -152,31 +151,24 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     T_init = 2.0 * np.pi / np.abs(omega)
     U_init = u_hopf[:,np.newaxis] + rho * (np.outer(qr, np.cos(2.0*np.pi*tau)) - np.outer(np.sign(omega)*qi, np.sin(2.0*np.pi*tau)))
     Q_init = np.append(U_init.flatten('F'), T_init)
-    print('U_init', U_init, U_init.shape)
-    print('Q_init', Q_init)
 
     # Try positive guess first
     p_init = p_hopf + rho**2
     rms = math.sqrt(M * L + 1.0)
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], verbose=True, maxiter=50)
-        print('QLC found', QLC)
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], maxiter=50)
         if QLC[-1] < 0.0 or np.any(np.isnan(QLC)) or np.any(np.isinf(QLC)):
             raise ValueError()
-        print('LC Found', QLC[:-1], QLC[-1])
         return QLC[:-1], QLC[-1], p_init
     except opt.NoConvergence:
-        print('noconvergence')
         LOG.info('Initial guess for the limit cycle failed. Trying different sign of p.')
     except ValueError:
-        print('valueerror')
         LOG.info('Initial guess for the limit cycle failed. Trying different sign of p.')
         
     # If it failed, try a negative guess
     p_init = p_hopf - rho**2
-    print('Trying again')
     try:
-        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], verbose=True, maxiter=50)
+        QLC = opt.newton_krylov(lambda Q : initialObjective(Q, p_init), Q_init, f_tol=6.e-6 * rms, rdiff=sp["rdiff"], maxiter=50)
     except opt.NoConvergence:
         LOG.info('Initializing the Limit Cylce failed. Not donig limit cycle continuation around this Hopf point.')
         return None

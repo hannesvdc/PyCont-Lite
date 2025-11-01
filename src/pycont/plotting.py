@@ -76,18 +76,15 @@ def _plotLimitCycleFamily(Q_points, T_values, p_values, p_hopf, M):
     norm = Normalize(p_values.min(), p_values.max())
     cmap = 'plasma'
     cm = plt.get_cmap(cmap)
-    print(T_values)
 
     n_points = Q_points.shape[0]
     stride = 10
-    for k in range(5, n_points, stride): # Ignore the first few unstable limit cycles
+    for k in range(0, n_points, stride):
         Q = Q_points[k,:]
         ut = np.reshape(Q, (M,L), 'F')
         x = ut[0,:]
         y = ut[1,:]
 
-        # close the loop for plotting aesthetics
-#        x_plot = np.r_[x, x[0]]; y_plot = np.r_[y, y[0]]
         color = cm(norm(p_values[k]))
         ax.plot(x, y, color=color)
 

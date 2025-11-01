@@ -81,7 +81,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
             those with largest real part (initialized by `scipy.eigs(which='LR')`) will reliably detect
             a pair of complex conjugated eigenvalues crossing the imaginar axis. Increasing `n_hopf_eigenvalues` 
             will improve test reliability but come at a computational cost. 
-        - "limit_cycle_continuation" : bool (default True)
+        - "limit_cycle_continuation" : bool (default `hopf_detection`)
             Whether to perform limit cycle continuation after a Hopf point was detected.
     verbosity : Verbosity or String or Int
         The level of verbosity required by the user. Can either be Verbosity.QUIET (1), Verbosity.INFO (2) or Verbosity.VERBOSE (3).
@@ -161,7 +161,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     hopf_detection = sp.get("hopf_detection", False)
     if hopf_detection:
         detectionModules.append(HopfDetectionModule(G, u0, p0, sp))
-    sp.setdefault("limit_cycle_continuation", True)
+    sp.setdefault("limit_cycle_continuation", hopf_detection)
 
     # Compute the initial tangent to the curve using the secant method
     LOG.info('\nComputing Initial Tangent to the Branch.')
@@ -353,29 +353,28 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     G_lc = lc.createLimitCycleObjectiveFunction(G, lc_points_init, M)
     
     # Solve G_lc again with the new initial guess (Q_init, lc_p_init)
-    print('Solving initial LC again with new objective function')
+    LOG.verbose('Solving initial LC again with new objective function')
     rdiff = sp["rdiff"]
     try:
-        Q_init = opt.newton_krylov(lambda q : G_lc(q, lc_p_init), Q_init, rdiff=rdiff, f_tol=1e-4, verbose=True)
+        Q_init = opt.newton_krylov(lambda q : G_lc(q, lc_p_init), Q_init, rdiff=rdiff, f_tol=1e-4, maxiter=50)
     except opt.NoConvergence as e:
         Q_init = e.args[0]
-    print('More accurate initial limit cycle: ', Q_init)
+    LOG.verbose(f'More accurate initial limit cycle: {Q_init}')
 
     # Calculate the iniital tangent along this branch. 
     LOG.info('\nComputing Initial Tangent to the Limit Cycle Branch.')
     p_dir = np.sign(lc_p_init - hopf_event.p)
     p1 = lc_p_init + 0.01*p_dir
-    print(hopf_event.p, lc_p_init, p_dir, p1)
     with np.errstate(over='ignore', under='ignore', divide='ignore', invalid='ignore'):
         try:
-            Q1 = opt.newton_krylov(lambda q: G_lc(q, p1), Q_init, rdiff=rdiff, f_tol=1e-4)
+            Q1 = opt.newton_krylov(lambda q: G_lc(q, p1), Q_init, rdiff=rdiff, f_tol=1e-4, maxiter=50)
         except opt.NoConvergence as e:
             Q1 = e.args[0]
     initial_tangent = (Q1 - Q_init) / (p1 - lc_p_init)
     initial_tangent = np.append(initial_tangent, p_dir); initial_tangent = initial_tangent / lg.norm(initial_tangent)
     tangent = computeTangent(G_lc, Q_init, lc_p_init, initial_tangent, sp, high_accuracy=False)
-    print('tangent final component', tangent[-1])
-    print('Initial G value', lg.norm(G_lc(Q1, p1)))
+    LOG.verbose(f'tangent final component {tangent[-1]}')
+    LOG.verbose(f'Initial G value {lg.norm(G_lc(Q1, p1))}')
     
     # Perform limit cycle continuation
     lcDetectionModules = []

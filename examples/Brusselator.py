@@ -13,7 +13,7 @@ def Brusselator():
     ds0 = 1e-3
     n_steps = 1000
     solver_parameters = {"tolerance" : tolerance, "hopf_detection" : True}
-    continuation_result = pycont.arclengthContinuation(G, x0, B0, ds_min, ds_max, ds0, n_steps, solver_parameters, verbosity='verbose')
+    continuation_result = pycont.arclengthContinuation(G, x0, B0, ds_min, ds_max, ds0, n_steps, solver_parameters)
 
     pycont.plotBifurcationDiagram(continuation_result)
 

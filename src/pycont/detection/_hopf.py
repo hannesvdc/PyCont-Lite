@@ -125,13 +125,12 @@ def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
         maxiter = 1000
         verbose=True
     else: # 1 NK step = 1 LGMRES solve but better.
-        tol = 1e-3 #1e-3
-        maxiter = 1 #1
+        tol = 1e-3
+        maxiter = 1
         verbose=False
 
     v = np.copy(v0)
     lam = lam0
-    print('lambda guess', lam0)
     for iter in range(3):
 
         # Compute the residual and break if it is small enough
