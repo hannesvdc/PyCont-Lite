@@ -55,6 +55,10 @@ def continuation(G : Callable[[np.ndarray, float], np.ndarray],
         The list of active detection modules for this continuation stage.
     sp : dict
 		Additional paramters for PyCont.
+	high_accuracy : bool
+		Simple flag in case we want reduced-accuracy computations. Only used for
+		limit cycle continuation until we figure out a good level of accuracy.
+		Will be deprecated in future releases (starting at 1.0.0).
 
     Returns
     -------

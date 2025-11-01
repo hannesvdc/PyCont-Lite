@@ -325,7 +325,7 @@ def _recursiveContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
         # Do LC continuation af the very end.
         if sp["limit_cycle_continuation"]:
-            _limitCylceContinuation(G, ds_min, ds_max, ds, n_steps, sp, termination_event_index, result)
+            _limitCylceContinuation(G, ds_min, ds_max, ds, n_steps, sp, termination_event_index, detectionModules, result)
 
 def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                             ds_min : float, 
@@ -334,7 +334,47 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                             n_steps : int, 
                             sp : Dict[str, Any],
                             from_event : int,
+                            detectionModules : List[DetectionModule],
                             result : ContinuationResult) -> None:
+    """
+    Internal function that performs pseudo-arclength continuation of limit cycles
+    after a Hopf point. This function does three things: 1) Compute the initial (small)
+    limit cycle around the Hopf point; 2) Build the limit cycle continuation objective 
+    function; 3) Call the main continuation code for limit cycle continuation.
+
+    Parameters
+    ----------
+    G : callable
+        Function representing the nonlinear system, with signature
+        ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    ds_min : float
+        Minimum allowable continuation step size.
+    ds_max : float
+        Maximum allowable continuation step size.
+    ds : float
+        Initial continuation step size.
+    n_steps : int
+        Maximum number of continuation steps to perform.
+    sp : dict
+        Additional paramters for PyCont.
+    from_event : int
+        Index of the Hopf bifurcation event that spawned the limit cycle continuation.
+    detectionModules : List[DetectionModule]
+        The list of active detection modules for this continuation stage.
+    result: ContinuationResult
+        Object that contains all continued branches and detected bifurcation points.
+
+    Returns
+    -------
+    Nothing, but `result` is updated with the new branche(s) and possible bifurcation points.
+
+    Notes
+    -----
+    This is the first implementation of this function, some things regarding initial point calculations, 
+    tangent calculations and mainly tolerances will change in later versions to make this
+    function more robust.
+    """
     LOG.info('Initializing Limit Cycle near the Hopf point.')
     hopf_event = result.events[from_event]
     branch_id = len(result.branches)
@@ -376,8 +416,11 @@ def _limitCylceContinuation(G : Callable[[np.ndarray, float], np.ndarray],
     LOG.verbose(f'tangent final component {tangent[-1]}')
     LOG.verbose(f'Initial G value {lg.norm(G_lc(Q1, p1))}')
     
-    # Perform limit cycle continuation
+    # Perform limit cycle continuation - ony keep param_min and param_max detection modules.
     lcDetectionModules = []
+    for module in detectionModules:
+        if module.kind == "PARAM_MIN" or module.kind == "PARAM_MAX":
+            lcDetectionModules.append(module)
     lc_branch, lc_termination_event = pac.continuation(G_lc, Q1, p1, tangent, 0.1*ds_min, ds_max, ds, n_steps, branch_id, lcDetectionModules, sp, high_accuracy=False)
 
     # Append the LC branch to the list of branches and return.

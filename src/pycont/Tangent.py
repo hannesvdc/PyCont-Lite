@@ -13,6 +13,38 @@ def computeTangent(G: Callable[[np.ndarray, float], np.ndarray],
 				   prev_tangent : np.ndarray, 
 				   sp : Dict,
                    high_accuracy : bool = True) -> np.ndarray:
+    """
+    Calculate the tangent to the curve defined by G(u,p) = 0 at (u,p) given
+    an initial guess `prev_tangent`. This function solves the extended linear
+    system [dG/du(u,p) t_u + dG/dp(u,p) t_p; prev_tangent^T (t_u, t_p)] = 0
+    using an iterative solver and finite differences approximations of the 
+    Jacobian dG/du.
+
+    Parameters
+    ----------
+    G : callable
+        Function representing the nonlinear system, with signature
+        ``G(u, p) -> ndarray`` where `u` is the state vector and `p`
+        is the continuation parameter.
+    u : ndarray
+        Current u-point on the curve.
+    p : float
+        Current parameter value along the curve.
+    prev_tangent : ndarray
+        Initial guess used for the L-GMRES solver.
+    sp : Dict
+        Solver parameters.
+    high_accuracy : bool (default True)
+        If true, a subsequent Newton-Krylov solve is performed when L-GMRES returns
+        with insufficient accuracy. scipy.newton_krylov generally calls L-GMRES
+        better than I can. Typically `False` for limit cycle continuation.
+    
+    Returns
+    -------
+    tangent : ndarray
+        Tangent to the curve at (u,p).
+    """
+
     rdiff = sp["rdiff"]
     M = len(u)
 

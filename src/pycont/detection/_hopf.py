@@ -119,14 +119,43 @@ def _JacobiDavidson(J : Callable[[np.ndarray], np.ndarray],
                     lam0 : np.complex128,
                     v0 : np.ndarray,
                     tolerance : str) -> Tuple[np.complex128, np.ndarray]:
+    """
+    Internal function that implements the Jacobi-Davidson procedure for
+    updating the leading eigenvalues and eigenvectors along the continuation
+    branch. The main idea is to solve `J(w) - lam w = r` with initial guess
+    `lam = lam0`, `w = v0` and `r = J(v0)` - the eigenpair in the previous continuation point.
+    The linear system is solved three times by updating `lam`, `w` and the residual `r` before 
+    returning. We assume sufficient accuracy has been reached after three solves.
+
+    This function has two modes given by `tolerance`: `accurate` and not accurate. `accurate` 
+    should be used for Hopf localization which requires more precise calculations. For Hopf
+    following, `accurate` mode is typically not required.
+
+    Parameters
+    ----------
+    J : Callable[ndarray] -> ndarray
+        The Jacobian of the objective function `G` at the new point `(u,p)` (implicit).
+    lam0 : complex
+        Eigenvalue at the previous point on the branch.
+    v0 : ndarray(complex)
+        Eigenvector at the previous point on the branch.
+    tolerance : str
+        `accurate` for high-precision calculations. Anything else otherwise.
+
+    Returns
+    -------
+    lam : complex
+        Good approximation of the eigenvalue of J at the current point.
+    v : ndarray(complex)
+        Good approximation of the eigenvector of J corresponding to `lam`
+        at the current point.
+    """
     M = len(v0)
     if tolerance == 'accurate':
         tol = 1e-4
-        maxiter = 1000
         verbose=True
     else: # 1 NK step = 1 LGMRES solve but better.
         tol = 1e-3
-        maxiter = 1
         verbose=False
 
     v = np.copy(v0)
@@ -168,7 +197,34 @@ def refreshHopfJacobiDavidson(G: Callable[[np.ndarray, float], np.ndarray],
                               eigvals_prev : np.ndarray,
                               eigvecs_prev : np.ndarray,
                               sp: Dict) -> Tuple[np.ndarray, np.ndarray, int]:
-    
+    """
+    Recompute Hopf state by updating the eigenvalues closest to the imaginary axis
+    using the Jacobi-Davidson procedure.
+
+    Parameters
+    ----------
+    G : Callable
+        The objective function.
+    u : ndarray
+        The current state vector on the path.
+    p : float
+        The current parameter value.
+    eigvals_prev : ndarray
+        The eigenvalues at the previous continuation piont.
+    eigvecs_prev : ndarray
+        The eigenvectors at the previous continuation point.
+    sp : Dict
+        Solver parameters including arguments `keep_r` and `m_target`.
+
+    Returns
+    -------
+    eigvals_new : ndarray
+        Eigenvalues of DG with largest real part at `(u,p)`
+    eigvecs_new : ndarray
+        Corresponding eigenvectors in the columns of this matrix
+    lead : int
+        The index of the leading eigenvalue - the one closest to the imaginary axis.
+    """
     omega_min = 1e-3
 
     eigvals_new = np.empty_like(eigvals_prev, dtype=np.complex128)
@@ -197,6 +253,7 @@ def refreshHopfJacobiDavidson(G: Callable[[np.ndarray, float], np.ndarray],
 
     return eigvals_new, eigvecs_new, lead
 
+@DeprecationWarning
 def refreshHopf(G: Callable[[np.ndarray, float], np.ndarray],
                 u : np.ndarray,
                 p : float,
@@ -315,6 +372,47 @@ def localizeHopfJacobiDavidson(G : Callable[[np.ndarray, float], np.ndarray],
                                w_right : np.ndarray,
                                M : int,
                                sp : Dict) -> Tuple[bool, np.ndarray, np.complex128, np.ndarray]:
+    """
+    Function to localize the Hopf point using the Jacobi-Davidson procedure.
+    A necessary condition is that a Hopf point must be passed, i.e., the leading
+    non-real eigenvalue must have switched sign.
+
+    We use the BrentQ algorithm on the real part of the leading eigenvalue, 
+    which vanishes at the Hopf bifurcation point.
+
+    Parameters
+    ----------
+    G : Callable
+        The objective function.
+    x_left : ndarray
+        Point on the branch before the Hopf point.
+    x_right : ndarray
+        Point on the branch after the Hopf point.
+    lam_left : complex
+        Leading eigenvalue at `x_left`.
+    lam_right : complex
+        Leading eigenvalue at `x_right`.
+    w_left : ndarray(complex)
+        Eigenvector corresponding to `lam_left`.
+    w_right : ndarray(complex)
+        Eigenvector corresponding to `lam_right`.
+    M : int
+        Size of the state vector `u`.
+    sp : Dict
+        Solver parameters.
+
+    Returns
+    -------
+    is_hopf : bool
+        True if the BrentQ solver converged and a Hopf point was passed, False otherwise.
+    x_hopf : ndarray
+        Location of the Hopf point.
+    lam_hopf : complex
+        Leading non-real eigenvalue at the Hopf point. This eigenvalue has a near-zero real
+        part when `is_hopf = True`.
+    eigvec_hopf : ndarray(complex)
+        Eigenvector corresponding to `lam_hopf`.
+    """
     rdiff = sp["rdiff"]
     nk_tolerance = max(rdiff, sp['tolerance'])
 
