@@ -15,9 +15,16 @@ with **automatic bifurcation detection, branch switching, and stability analysis
 - **Adaptive continuation**: robust predictor–corrector with adjustable step sizes.  
 - **Bifurcation detection**: automatically localizes and classifies folds and branch points.  
 - **Branch switching**: continues all discovered branches recursively.  
-- **Stability analysis**: computes leading eigenvalues to distinguish stable vs. unstable segments.  
+- **Stability analysis**: computes leading eigenvalues to distinguish stable vs. unstable segments.
+- **Hopf Detection**: detect and localize Hopf bifurcation points where the system changes from a steady state
+to period behavior (a limit cycle).
+- **Limit Cycle Continuation** : Initialize the small-amplitude limit cycle around the Hopf point, and perform
+numerical continuation of this limit cycle. 
 - **Lightweight plotting**: quickly visualize bifurcation diagrams with `plotBifurcationDiagram`. Plots automatically distinguish stable vs. unstable branches.
 - **Structured output**: branches (with stability) and events (folds, bifurcations) are returned for further analysis.
+
+The main goal of PyCont-Lite is to provide a **unified continuation and bifurcation toolkit for PDEs and neural models**. We explicitly aim for
+a complete backend-agnostic implementation so PyCont-Lite can be used with numpy, PyTorch and Jax.
 
 ## Installation & Requirements
 PyCont-Lite requires only:
@@ -235,8 +242,41 @@ which produces the (trivial) bifurcation diagram
 
 For now, Hopf bifurcation detection is disabled by default, so the user must supply it via `'hopf_detection' : True` in the solver parameters.
 
-### Advanced Hopf Example: The Fitzhugh-Nagumo PDEs
-For a more interesting system that exhibits a Hopf bifurcation, consider the Fitzhugh-Nagumo PDEs
+Since version 0.6.0, PyCont-Lite can also perform limit cycle computations and continuation. The limit cylces for the Normal Hopf example 
+are concentric circles.
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/NormalHopfLC.png" width="400">
+</p>
+
+Limit cycle continuation is enabled whenever Hopf detection is enabled. Users can opt out of limit cycle coninuation via the `'limit_cycle_continuation' : False` flag in the solver parameters.
+
+### The Brusselator
+A classical yet chemically important system that has Hopf and limit-cyle dynamics is the Brusselator (see `examples/Brusselator.py`).
+
+$$
+\begin{align}
+A - (B+1) x + x^2 y &= 0 \\
+B x - x^2 y &= 0 \\
+\end{align}
+$$
+
+For $A = 1$, this system has a Hopf bifurcation at $B = 1$
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/BrusselatorHopf.png" width="400">
+</p>
+
+and the limit cycles initially look elliptic
+
+<p align="center">
+    <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/BrusselatorLC.png" width="400">
+</p>
+
+Both the bifurcation diagram and small-amplitude limit cylces have been computed using PyCont-Lite.
+
+### Advanced Hopf Example: The Fitzhugh-Nagumo Equations
+For a more interesting system that exhibits a Hopf bifurcation, consider the Fitzhugh-Nagumo equations
 
 $$
 \begin{align}
@@ -287,6 +327,8 @@ and Hopf points nicely
     <img src="https://raw.githubusercontent.com/hannesvdc/PyCont-Lite/main/docs/images/FHN.png" width="400">
 </p>
 
+limit cycle calculations are very expensive for high-dimensional systems, so we do not show them here.
+
 ## Plotting Bifurcation Diagrams
 
 PyCont-Lite includes a helper function `plotBifurcationDiagram` for quick visualization. Stable segments are shown as solid lines and unstable segments as dashed lines, just like in AUTO/MATCONT.
@@ -321,6 +363,7 @@ solver_parameters = {
     "initial_directions": "both"  # 'both', 'increase_p', 'decrease_p'
 }
 ```
+A full list of options can be found in the documentation of the main `arclengthContinuation` function.
 
 ## Verbosity Options
 Control how much progress info PyCont-Lite prints during continuation. Three levels are supported:
@@ -355,7 +398,6 @@ This makes it easy to explore and plot bifurcation diagrams programmatically.
 
 ## Planned Features
 The following features are under active consideration for future releases:
-- Limit cycle continuation
 - Complete backend-agnostic implementation
 - Choice of finite-differences or external automatic differentiation for gradients.
 

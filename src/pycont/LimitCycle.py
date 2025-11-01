@@ -43,7 +43,7 @@ def buildODEObjective(G : Callable[[np.ndarray, float], np.ndarray],
 def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarray],
                                       U_ref : np.ndarray,
                                       M : int,
-                                      L : int = 512) -> Callable[[np.ndarray, float], np.ndarray]:
+                                      L : int = 256) -> Callable[[np.ndarray, float], np.ndarray]:
     """
     Internal function to create the objective function for limit cycle continuation, 
     starting from the initial (typically tiny) limit cycle `X_ref`.
@@ -58,7 +58,7 @@ def createLimitCycleObjectiveFunction(G : Callable[[np.ndarray, float], np.ndarr
         The size of the state variable `u`.
     L : int
         The number of collocation points on the limit cycle. As a default, we represent 
-        the limit cycle in `L=16` points.
+        the limit cycle in `L=128` points.
 
     Returns
     -------
@@ -91,7 +91,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
                                omega : float,
                                eigvec : np.ndarray,
                                M : int,
-                               L : int = 512,
+                               L : int = 256,
                                rho : float = 0.01) -> Optional[Tuple[np.ndarray, float, float]]:
     """
     Calculate the initial limit cycle close to the Hopf bifurcation point.
@@ -111,7 +111,7 @@ def calculateInitialLimitCycle(G : Callable[[np.ndarray, float], np.ndarray],
     M : int
         The dimension of the state vector `u`.
     L : int
-        The number of collocation points along the limit cyle. Default 16.
+        The number of collocation points along the limit cyle. Default 128.
     rho : float
         Initial offset from the Hopf point used to seed the Newton-Krylov method.
         Default is 1e-2.
