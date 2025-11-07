@@ -51,7 +51,7 @@ def G(u, p):
 
 # Initial guess
 u0 = np.array([-3.0])
-p0 = 0.0
+p0 = 9.0
 
 # Run continuation
 ds_max = 0.01
