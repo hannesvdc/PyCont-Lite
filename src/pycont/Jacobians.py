@@ -11,6 +11,9 @@ class AbstractJacobian(abc.ABC):
         - `getJacobianFunctional()` returns the Jacobian constructor function or None.
         - `getParameterDerivativeFunctional()` returns the paramter derivative constructor function.
     """
+    def __init__(self,
+                 n : int) -> None:
+        self.n = n
 
     @abc.abstractmethod
     def getJacobianAt(self,
@@ -33,6 +36,8 @@ class FullJacobian (AbstractJacobian):
                  n : int,
                  Gu : Callable[[np.ndarray, float], Any],
                  Gp : Callable[[np.ndarray, float], np.ndarray]) -> None:
+        super().__init__(n)
+
         def innerJacobianFunctional(u : np.ndarray, p : float):
             J = Gu(u, p)
             matvec = lambda v : J @ v
@@ -55,6 +60,8 @@ class MatrixVectorJacobian (AbstractJacobian):
                  n : int,
                  Gu_v : Callable[[np.ndarray, float, np.ndarray], np.ndarray],
                  Gp : Callable[[np.ndarray, float], np.ndarray]) -> None:
+        super().__init__(n)
+
         self.jacobianFunctional = lambda u, p: slg.LinearOperator(shape=(n,n), matvec=lambda v: Gu_v(u, p, v)) # type: ignore
         self.parameterDerivative = lambda u, p : Gp(u, p)
 
@@ -72,11 +79,10 @@ class MatrixFreeJacobian (AbstractJacobian):
                  n : int,
                  G : Callable[[np.ndarray, float], np.ndarray],
                  rdiff : float) -> None:
-        self.n = n
+        super().__init__(n)
+
         self.G = G
         self.rdiff = rdiff
-
-        self.parameterDerivative = lambda u, p : (self.G(u, p + rdiff) - self.G(u, p - rdiff)) / (2.0*rdiff)
 
     def getJacobianAt(self, u: np.ndarray, p: float) -> slg.LinearOperator:
         def matvec(v : np.ndarray) -> np.ndarray:
@@ -88,4 +94,4 @@ class MatrixFreeJacobian (AbstractJacobian):
         return slg.LinearOperator(shape=(self.n, self.n), matvec=matvec) # type: ignore
     
     def getParameterDerivativeAt(self, u: np.ndarray, p: float) -> np.ndarray:
-        return self.parameterDerivative(u, p)
+        return (self.G(u, p + self.rdiff) - self.G(u, p - self.rdiff)) / (2.0*self.rdiff)
