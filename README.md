@@ -58,8 +58,8 @@ ds_max = 0.01
 ds_min = 1.e-6
 ds = 0.001
 n_steps = 1000
-solver_parameters = {"tolerance": 1e-10}
-continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds, n_steps, solver_parameters=solver_parameters)
+continuation_parameters = {"tolerance": 1e-10}
+continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds, n_steps, continuation_parameters=continuation_parameters)
 
 # Plot the solution curve
 pycont.plotBifurcationDiagram(continuation_result)
@@ -87,8 +87,8 @@ ds_max = 0.01
 ds_min = 1.e-6
 ds = 0.001
 n_steps = 5000
-solver_parameters = {"tolerance": 1e-10}
-continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds, n_steps, solver_parameters=solver_parameters)
+continuation_parameters = {"tolerance": 1e-10}
+continuation_result = pycont.arclengthContinuation(G, u0, p0, ds_min, ds_max, ds, n_steps, continuation_parameters=continuation_parameters)
 
 # Plot the curves
 pycont.plotBifurcationDiagram(continuation_result)
@@ -133,8 +133,8 @@ ds_max = 0.01
 ds_min = 1e-6
 ds0 = 1e-4
 n_steps = 2000
-solver_parameters = {"tolerance": 1e-10}
-continuation_result = pycont.arclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters)
+continuation_parameters = {"tolerance": 1e-10}
+continuation_result = pycont.arclengthContinuation(G, u0, lam0, ds_min, ds_max, ds0, n_steps, continuation_parameters=continuation_parameters)
 
 # Plot the bifurcation diagram (lambda, max(u))
 u_transform = lambda u : np.sign(u[50]) * np.max(np.abs(u))
@@ -185,8 +185,8 @@ ds_max = 1e-2
 ds_min = 1e-6
 ds0 = 1e-4
 n_steps = 1000
-solver_parameters = {"tolerance" : tolerance, "param_min" : 0.22, "param_max" : 0.7}
-continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters=solver_parameters, verbosity='verbose')
+continuation_parameters = {"tolerance" : tolerance, "param_min" : 0.22, "param_max" : 0.7}
+continuation_result = pycont.arclengthContinuation(G, phi0, eps0, ds_min, ds_max, ds0, n_steps, continuation_parameters=continuation_parameters, verbosity='verbose')
 
 # Plot the bifurcation diagram eps versus phi(x=-1)
 u_transform = lambda phi: phi[0]
@@ -228,8 +228,8 @@ ds_max = 0.01
 ds_min = 1.e-6
 ds = 0.01
 n_steps = 200
-solver_parameters = {"tolerance": 1e-10, 'hopf_detection' : True}
-continuation_result = pycont.arclengthContinuation(G, u0, mu0, ds_min, ds_max, ds, n_steps, solver_parameters)
+continuation_parameters = {"tolerance": 1e-10, 'hopf_detection' : True}
+continuation_result = pycont.arclengthContinuation(G, u0, mu0, ds_min, ds_max, ds, n_steps, continuation_parameters=continuation_parameters)
 
 pycont.plotBifurcationDiagram(continuation_result, p_label=r'$\mu$')
 ```
@@ -312,8 +312,8 @@ ds_max = 0.01
 ds_min = 1e-6
 ds0 = 1e-3
 n_steps = 1000
-solver_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
-continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, solver_parameters)
+continuation_parameters = {"tolerance" : tolerance, "param_min" : 0.01, "hopf_detection" : True}
+continuation_result = pycont.arclengthContinuation(G, z0, eps0, ds_min, ds_max, ds0, n_steps, continuation_parameters=continuation_parameters)
 
 # Plot the bifurcation diagram `eps` versus <u>
 u_transform = lambda z: np.average(z[:N])
@@ -350,11 +350,11 @@ For multi-dimensional systems, you can specify how to reduce $u$ to a single sca
 pycont.plotBifurcationDiagram(result, u_transform=lambda u: u.max())
 ```
 
-## Solver Parameters
+## Continuation Parameters
 
-You can fine-tune the solver by passing a dictionary:
+You can fine-tune the continuation algorithm by passing a dictionary:
 ```python
-solver_parameters = {
+continuation_parameters = {
     "rdiff": 6e-6,              # central finite-difference step
     "nk_maxiter": 20,           # Newton-Krylov iterations
     "tolerance": 1e-10,         # nonlinear tolerance
@@ -397,10 +397,8 @@ Default is `info`. See the Allen–Cahn example above for a typical verbose run.
 This makes it easy to explore and plot bifurcation diagrams programmatically.
 
 ## Planned Features
-The following features are under active consideration for future releases:
-- Complete backend-agnostic implementation
-- Choice between finite-differences and explicit user-specified Jacobians
-- Features for external automatic differentiation for gradients.
+The following features are under active development:
+- Choice between explicit Jacobians, ones defined by matrix-vector products (AD) or (default) finite-differences.
 
 ## License
 
