@@ -14,7 +14,8 @@ requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",
-    "matplotlib"
+    "matplotlib",
+    "inspect"
 ]
 dynamic = ["version"]
 

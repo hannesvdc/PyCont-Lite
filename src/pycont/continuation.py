@@ -11,8 +11,10 @@ from .Types import ContinuationResult, Event
 from .exceptions import InputError
 from .Tangent import computeTangent
 from .Logger import LOG, Verbosity, configureLOG
+from .Jacobians import FullJacobian, MatrixVectorJacobian, MatrixFreeJacobian
 
 from typing import Callable, Optional, Dict, Any, List
+import inspect
 
 def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray], 
                                 u0 : np.ndarray,
@@ -20,13 +22,16 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
                                 ds_min : float, 
                                 ds_max : float, 
                                 ds_0 : float, 
-                                n_steps : int, 
-                                solver_parameters : Optional[Dict] = None,
+                                n_steps : int,
+                                *,
+                                jacobian : Optional[Callable] = None,
+                                parameter_derivative : Optional[Callable] = None, 
+                                continuation_parameters : Optional[Dict] = None,
                                 verbosity: Verbosity | str | int = Verbosity.INFO,) -> ContinuationResult:
     """
     Perform pseudo-arclength continuation for a nonlinear system G(u, p) = 0.
 
-    This method numerically tracks solution branches of parameter-dependent
+    This method numerically tracks solution branches of parameter
     nonlinear equations using the pseudo-arclength continuation method with 
     internal Newton-Krylov solver. It adapts the step size to remain within 
     the specified bounds and applies Newton iterations at each step to maintain accuracy.
@@ -49,7 +54,15 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         Initial continuation step size.
     n_steps : int
         Maximum number of continuation steps to perform.
-    solver_parameters : dict, optional
+    jacobian:
+        Allows to pass a Jacobian for continuation. The type of Jacobian will determine the
+        type of solver (linear and nonlinear) algorithms used. Three types are recognized:
+            . Callable J(u, p) with exactly two arguments - assumed to return the full Jacobian matrix
+            . Callable J(u, p, v) with exactly three arguments - assumed to return Jacobian-vector products J(u,p) @ v
+            . None: The Jacobian is computed on the fly using finite differences.
+    parameter_derivative: Callable that implements dG/dp. Typically a simple callable or None. The type is 
+        linked to the type of "jacobian".
+    continuation_parameters : dict, optional
         Tuning knobs for the corrector and numerics. Recognized keys:
         - "rdiff": float (default 1e-8)
             Finite-difference increment for Jacobian-vector products.
@@ -89,8 +102,7 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
 
     Returns
     -------
-    ContinuationResult
-        With fields:
+    ContinuationResult: Struct with fields:
         - branches
         - events
 
@@ -122,7 +134,36 @@ def pseudoArclengthContinuation(G : Callable[[np.ndarray, float], np.ndarray],
         raise InputError(f"Shape mismatch between u0 and G(u0, p0). Got shapes {u0.shape} and {G0.shape} respectively.")
     
     # Verify and set default the solver parameters
-    sp = {} if solver_parameters is None else dict(solver_parameters)
+    sp = {} if continuation_parameters is None else dict(continuation_parameters)
+    rdiff = sp.setdefault("rdiff", 6.6e-6)
+    nk_maxiter = sp.setdefault("nk_maxiter", 10)
+    tolerance = sp.setdefault("tolerance", 1e-10)
+    if nk_maxiter <= 0:
+        raise InputError(f"nk_maxiter must be strictly positive. Got {nk_maxiter}.")
+    if tolerance <= 0.0:
+        raise InputError(f"tolerance must be strictly positive. Got {tolerance}.")
+    sp.setdefault("analyze_stability", True)
+    sp.setdefault("seed", 12345)
+    sp["s_jump"] = 0.01
+
+    # Setup the Jacobian
+    if jacobian is None:
+        derivatives = MatrixFreeJacobian(M, G, rdiff)
+    elif not callable(jacobian):
+        LOG.info("`jacobian` is not of type callable, treating as None.")
+        derivatives = MatrixFreeJacobian(M, G, rdiff)
+    elif len(inspect.signature(jacobian).parameters) == 2:
+        if not callable(parameter_derivative):
+            raise InputError("`parameter_derivative` is not of type callable, but `jacobian` is. Returning.")
+        derivatives = FullJacobian(M, jacobian, parameter_derivative) # type: ignore
+    elif len(inspect.signature(jacobian).parameters) == 3:
+        if not callable(parameter_derivative):
+            raise InputError("`parameter_derivative` is not of type callable, but `jacobian` is. Returning.")
+        derivatives = MatrixVectorJacobian(M, jacobian, parameter_derivative) # type: ignore
+    else:
+        raise InputError("Could not convert argument `jacobian` to a known type. Must be a callable with two or three arguments, or `None`. Returning.")
+
+    # Verify and set default the solver parameters
     rdiff = sp.setdefault("rdiff", 6.6e-6)
     nk_maxiter = sp.setdefault("nk_maxiter", 10)
     tolerance = sp.setdefault("tolerance", 1e-10)
